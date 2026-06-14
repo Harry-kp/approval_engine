@@ -1,0 +1,38 @@
+<% content_for :title, "Approvals" %>
+<h1>Approvals</h1>
+
+<div class="ae-filters">
+  <%= link_to approvals_path, class: ("is-active" unless @status) do %>
+    All <span class="ae-count"><%= @counts.values.sum %></span>
+  <% end %>
+  <% ApprovalEngine::Approval::STATUSES.each do |status| %>
+    <%= link_to approvals_path(status: status), class: ("is-active" if @status == status) do %>
+      <%= status.tr("_", " ") %> <span class="ae-count"><%= @counts.fetch(status, 0) %></span>
+    <% end %>
+  <% end %>
+</div>
+
+<% if @approvals.empty? %>
+  <div class="ae-empty">No approvals<%= " with status #{@status}" if @status %>.</div>
+<% else %>
+  <table>
+    <thead>
+      <tr><th>Target</th><th>Event</th><th>Status</th><th>Tracks</th><th>Created</th><th></th></tr>
+    </thead>
+    <tbody>
+      <% @approvals.each do |approval| %>
+        <tr>
+          <td class="ae-mono"><%= target_label(approval.target) %></td>
+          <td><%= approval.event_name || "—" %></td>
+          <td><%= status_badge(approval.status) %></td>
+          <td><%= @track_counts.fetch(approval.id, 0) %></td>
+          <td class="ae-meta"><%= approval.created_at.to_fs(:short) %></td>
+          <td><%= link_to "View", approval_path(approval) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+  <% if @total > @approvals.size %>
+    <p class="ae-meta">Showing the most recent <%= @approvals.size %> of <%= @total %>.</p>
+  <% end %>
+<% end %>

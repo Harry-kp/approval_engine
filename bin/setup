@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+echo "== Installing dependencies =="
+bundle install
+
+echo "== Preparing the test database =="
+echo "Set DATABASE_URL to your Postgres if it isn't on the default socket."
+bin/rails app:db:test:prepare
+
+echo "== Done. Run the suite with: bin/rails app:test =="

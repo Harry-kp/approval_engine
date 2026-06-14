@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# One command to see ApprovalEngine working: prepares the database, seeds a live
+# approval flow, and boots the dummy app so you can watch it in the dashboard.
+#
+# Point it at any Postgres with DATABASE_URL if you're not on the default socket:
+#   DATABASE_URL=postgres://localhost bin/demo
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+echo "== Preparing database =="
+bin/rails app:db:prepare
+
+echo "== Seeding a live demo approval =="
+bin/rails app:db:seed
+
+echo
+echo "== Starting the dummy app =="
+echo "   Dashboard: http://localhost:3000/approval_engine"
+echo
+cd test/dummy && exec bin/rails server

@@ -1,0 +1,55 @@
+===============================================================================
+
+ApprovalEngine installed.
+
+Next steps:
+
+  1. Run the migrations:
+
+       rails db:migrate
+
+  2. Edit config/initializers/approval_engine.rb and set BOTH:
+       * actor_class           — your approver class (e.g. "User")
+       * current_tenant_method — REQUIRED. Until it's set, auto-routing on
+                                 create silently does nothing. Single-tenant
+                                 apps can return a constant.
+
+  3. Make your actor class resolve approval groups:
+
+       class User < ApplicationRecord
+         def self.resolve_approval_group(group_name, target)
+           where(role: group_name)
+         end
+       end
+
+  4. Arm a model and declare its safe surface (a rule can only read attributes
+     you expose here):
+
+       class Invoice < ApplicationRecord
+         has_approvals
+
+         exposes_for_approval do
+           attribute :amount, type: :decimal
+         end
+
+         def after_approved
+           PaymentService.disburse_funds!(self)
+         end
+       end
+
+  5. Create an ACTIVE template + a matching rule (see the README quickstart),
+     then CONFIRM the wiring before relying on it:
+
+       invoice.preview_approval(event: "invoice.created").triggered?
+       # false? -> check event_name match, the template's `active` status,
+       #           the rule condition, and that its vars are exposed attributes.
+
+  6. (Optional) Copy the approval views to customise them:
+
+       rails generate approval_engine:views
+
+  7. (Optional) Mount the ops dashboard in config/routes.rb:
+
+       mount ApprovalEngine::Engine => "/approval_engine"
+
+===============================================================================

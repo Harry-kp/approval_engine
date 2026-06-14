@@ -1,0 +1,23 @@
+# Database config for the engine's throwaway test/dummy app only.
+#
+# ApprovalEngine is intentionally PostgreSQL-specific (it relies on jsonb, gin
+# indexes and gen_random_uuid()), so the dummy app targets Postgres. Consumers
+# of the gem never see this file — they bring their own adapter and config.
+#
+# Connection params (host/port/user) come from DATABASE_URL when set; the
+# database *names* below are always preserved so the test DB can never clobber
+# the development DB. Example:
+#   DATABASE_URL=postgres://postgres@127.0.0.1:5433 bin/rails app:test
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  url: <%= ENV["DATABASE_URL"] %>
+
+development:
+  <<: *default
+  database: dummy_development
+
+test:
+  <<: *default
+  database: dummy_test

@@ -1,0 +1,26 @@
+name: Release
+
+# Push a version tag (e.g. v0.1.0) to build, publish to RubyGems, and cut a
+# GitHub release. Uses RubyGems Trusted Publishing (OIDC) — no API key secret.
+# One-time setup: add this repo + workflow as a trusted publisher for the gem
+# at https://rubygems.org/gems/approval_engine/trusted_publishers
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write # create the GitHub release
+  id-token: write # OIDC token for RubyGems trusted publishing
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+      - name: Build, publish to RubyGems, and create the GitHub release
+        uses: rubygems/release-gem@v1

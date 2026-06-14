@@ -1,0 +1,17 @@
+<%# Copied by `rails generate approval_engine:views`. Style this however you like. %>
+<h1>My approvals</h1>
+
+<% if @pending_steps.empty? %>
+  <p>Nothing is awaiting your approval.</p>
+<% else %>
+  <ul>
+    <% @pending_steps.each do |step| %>
+      <li>
+        <strong><%= step.target %></strong> —
+        <%= step.name || "Step" %> (layer <%= step.layer %>, iteration <%= step.iteration %>)
+        <%= button_to "Approve", approve_approval_path(step), method: :patch %>
+        <%= button_to "Reject", reject_approval_path(step), method: :patch %>
+      </li>
+    <% end %>
+  </ul>
+<% end %>

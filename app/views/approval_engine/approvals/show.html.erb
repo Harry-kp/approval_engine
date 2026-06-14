@@ -1,0 +1,55 @@
+<% content_for :title, "Approval" %>
+<%= link_to "← All approvals", approvals_path, class: "ae-back" %>
+<h1>Approval <%= status_badge(@approval.status) %></h1>
+
+<div class="ae-card">
+  <div><strong>Target:</strong> <span class="ae-mono"><%= target_label(@approval.target) %></span></div>
+  <div><strong>Event:</strong> <%= @approval.event_name || "—" %></div>
+  <div><strong>Tenant:</strong> <span class="ae-mono"><%= @approval.tenant_id %></span></div>
+  <div class="ae-meta">Created <%= @approval.created_at.to_fs(:short) %></div>
+</div>
+
+<% @approval.tracks.each do |track| %>
+  <h2><%= track.name %> <%= status_badge(track.status) %></h2>
+  <table>
+    <thead>
+      <tr><th>Iter</th><th>Layer</th><th>Step</th><th>Assigned</th><th>Consensus</th><th>Status</th><th>Time in step</th></tr>
+    </thead>
+    <tbody>
+      <% track.steps.sort_by { |s| [s.iteration, s.layer] }.each do |step| %>
+        <tr>
+          <td><%= step.iteration %></td>
+          <td><%= step.layer %></td>
+          <td><%= step.name || "—" %></td>
+          <td class="ae-mono"><%= actor_label(step.assigned_actor) %></td>
+          <td><%= step.approvals_required %></td>
+          <td><%= status_badge(step.status) %></td>
+          <td class="ae-meta"><%= step.activated_at ? distance_of_time_in_words(step.activated_at, step.decided_at || Time.current) : "—" %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>
+
+<h2>Audit trail</h2>
+<% logs = @approval.steps.flat_map(&:audit_logs).sort_by(&:created_at) %>
+<% if logs.empty? %>
+  <div class="ae-empty">No audit events yet.</div>
+<% else %>
+  <table>
+    <thead>
+      <tr><th>When</th><th>Event</th><th>Actual actor</th><th>Intended</th><th>Comment</th></tr>
+    </thead>
+    <tbody>
+      <% logs.each do |log| %>
+        <tr>
+          <td class="ae-meta"><%= log.created_at.to_fs(:short) %></td>
+          <td><%= status_badge(log.event) %></td>
+          <td class="ae-mono"><%= actor_label(log.actual_actor) %></td>
+          <td class="ae-mono"><%= log.by_proxy? ? actor_label(log.intended_actor) : "—" %></td>
+          <td><%= log.comment %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>

@@ -1,0 +1,21 @@
+/.bundle/
+/doc/
+/log/*.log
+/pkg/
+/tmp/
+/test/tmp/
+/test/dummy/log/*.log
+/test/dummy/storage/
+/test/dummy/tmp/
+
+# Built gems — produced by `gem build` / `rake build`, never committed.
+*.gem
+
+# A library resolves dependencies fresh; the lock isn't part of the gem repo.
+/Gemfile.lock
+
+# SimpleCov output.
+/coverage/
+
+# OS / editor cruft.
+.DS_Store

@@ -1,0 +1,11 @@
+inherit_gem:
+  rubocop-rails-omakase: rubocop.yml
+
+AllCops:
+  TargetRubyVersion: 3.1
+  Exclude:
+    - "test/dummy/**/*"
+    - "tmp/**/*"
+    - "bin/**/*"
+    - "vendor/**/*"
+    - "db/migrate/*" # generated schema, kept verbatim

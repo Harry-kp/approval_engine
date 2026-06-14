@@ -1,0 +1,13 @@
+#!/usr/bin/env ruby
+# An IRB session with the engine loaded inside the dummy app, so you can poke at
+# the real models and services live.
+#
+#   bin/console
+#   >> Rails.application.load_seed   # build a sample approval to play with
+ENV["RAILS_ENV"] ||= "development"
+require_relative "../test/dummy/config/environment"
+require "irb"
+
+puts "ApprovalEngine console — dummy app (#{Rails.env})."
+puts "Seed a live demo with:  Rails.application.load_seed"
+IRB.start
