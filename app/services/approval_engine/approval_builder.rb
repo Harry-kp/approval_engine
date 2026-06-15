@@ -17,22 +17,25 @@ module ApprovalEngine
 
     # Build a single-track approval from one template. `event_name` is the event
     # that triggered this run (nil when started manually) — recorded on the
-    # Approval for audit/display.
-    def self.build!(template:, target:, event_name: nil)
-      new(templates: [ template ], target: target, event_name: event_name).build!
+    # Approval for audit/display. `trigger_rule` is the rule that matched, when
+    # auto-routed, so the approval remembers its provenance.
+    def self.build!(template:, target:, event_name: nil, trigger_rule: nil)
+      new(templates: [ template ], target: target, event_name: event_name, trigger_rule: trigger_rule).build!
     end
 
-    # Build a scatter-gather approval with one parallel track per template.
+    # Build a scatter-gather approval with one parallel track per template. No
+    # single rule routes a parallel run, so there's no provenance to record.
     def self.build_parallel!(templates:, target:, event_name: nil)
       raise BuilderError, "build_parallel! needs at least one template" if templates.blank?
 
       new(templates: templates, target: target, event_name: event_name).build!
     end
 
-    def initialize(templates:, target:, event_name: nil)
-      @templates  = templates
-      @target     = target
-      @event_name = event_name
+    def initialize(templates:, target:, event_name: nil, trigger_rule: nil)
+      @templates    = templates
+      @target       = target
+      @event_name   = event_name
+      @trigger_rule = trigger_rule
     end
 
     def build!
@@ -58,14 +61,15 @@ module ApprovalEngine
 
     private
 
-    attr_reader :templates, :target, :event_name
+    attr_reader :templates, :target, :event_name, :trigger_rule
 
     def build_approval
       Approval.create!(
         tenant_id: templates.first.tenant_id,
         target: target,
         status: "pending",
-        event_name: event_name
+        event_name: event_name,
+        trigger_rule: trigger_rule
       )
     end
 

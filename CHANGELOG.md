@@ -46,9 +46,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   top-priority one), and `run_approval!(templates:)` starts a chosen
   one (or several, as parallel tracks) — so a user can decide instead of the
   engine auto-routing by priority.
+- `approval.trigger_rule` — provenance: the `TriggerRule` that auto-routed an
+  approval (nil for a manual `run_approval!(templates:)` start), captured at
+  build time so it stays stable even if the rule is edited or retired later.
 - Consensus per layer via `approvals_required`: `:any`, `:all`, `:majority`, a
   percentage like `"60%"`, or a fixed count — resolved against the live group
   size, so authors express policy without hard-coding headcount.
+- `track.layer_tally(layer)` — a public read of a layer's live consensus tally
+  (`required` / `approved` / `rejected` / `pending` / `group_size` / `outcome`),
+  so a UI can show "N of M approved" and *why* a layer is met/failed/undecided
+  without re-deriving the consensus math the engine owns.
 - Consensus-aware rejection: a reject respects the layer's policy, failing the
   approval as soon as the required approvals become unreachable (one no for
   `:all`; every actor for `:any`; too few voters left to reach a count) rather

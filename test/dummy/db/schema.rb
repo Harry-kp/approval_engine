@@ -10,11 +10,12 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_14_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_16_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
   create_table "approval_engine_approvals", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "approval_engine_trigger_rule_id"
     t.datetime "created_at", null: false
     t.string "event_name"
     t.string "status", default: "pending", null: false
@@ -22,6 +23,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_14_120000) do
     t.string "target_type", null: false
     t.string "tenant_id", null: false
     t.datetime "updated_at", null: false
+    t.index ["approval_engine_trigger_rule_id"], name: "idx_ae_approvals_on_trigger_rule"
     t.index ["status"], name: "index_approval_engine_approvals_on_status"
     t.index ["target_type", "target_id", "created_at"], name: "idx_ae_approvals_target_recency"
     t.index ["target_type", "target_id"], name: "index_approval_engine_approvals_on_target"
@@ -170,6 +172,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_14_120000) do
     t.datetime "updated_at", null: false
   end
 
+  add_foreign_key "approval_engine_approvals", "approval_engine_trigger_rules", on_delete: :nullify
   add_foreign_key "approval_engine_audit_logs", "approval_engine_steps"
   add_foreign_key "approval_engine_steps", "approval_engine_tracks"
   add_foreign_key "approval_engine_template_steps", "approval_engine_track_templates"

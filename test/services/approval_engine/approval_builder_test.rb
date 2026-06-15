@@ -48,6 +48,25 @@ module ApprovalEngine
       assert_nil approval.event_name
     end
 
+    test "build! records the matched rule as provenance when given one" do
+      create_user(role: :manager)
+      template = create_template(event: "invoice.created", steps: [ { group: "manager" } ])
+      rule = create_rule(template: template, condition: { "==" => [ 1, 1 ] })
+
+      approval = ApprovalBuilder.build!(template: template, target: @invoice, trigger_rule: rule)
+
+      assert_equal rule, approval.trigger_rule
+    end
+
+    test "build_parallel! records no rule provenance (no single rule routes it)" do
+      create_user(role: :legal)
+      legal = create_template(event: "invoice.created", name: "Legal", steps: [ { group: "legal" } ])
+
+      approval = ApprovalBuilder.build_parallel!(templates: [ legal ], target: @invoice)
+
+      assert_nil approval.trigger_rule
+    end
+
     test "build_parallel! creates one track per template under a single approval" do
       create_user(role: :legal)
       create_user(role: :it)
