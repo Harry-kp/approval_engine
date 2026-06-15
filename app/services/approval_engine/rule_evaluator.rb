@@ -49,7 +49,7 @@ module ApprovalEngine
       status, rule = find_match
       case status
       when :match
-        ApprovalBuilder.build!(template: rule.track_template, target: target, event_name: event_name)
+        ApprovalBuilder.build!(template: rule.track_template, target: target, event_name: event_name, trigger_rule: rule)
       when :error
         raise EvaluationError, @failure_reason if ApprovalEngine.config.raise_on_rule_errors
 

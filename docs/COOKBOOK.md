@@ -679,6 +679,22 @@ end
 SLA thresholds, reminders, escalation, and leaderboards are yours to build —
 the gem deliberately doesn't impose a definition of "too slow".
 
+### "How close is this layer to consensus?" (live tally)
+
+When a layer gathers several approvers, `track.layer_tally(layer)` returns the
+same facts the engine decides on — so a UI can show "N of M approved" and *why*
+a layer is met, failed, or still undecided, without re-implementing the
+consensus math:
+
+```ruby
+track.layer_tally(1)
+# => { required: 2, approved: 1, rejected: 0, pending: 2,
+#      group_size: 3, outcome: :undecided }
+```
+
+It defaults to the track's latest iteration; pass `iteration:` to read a
+specific rework round. `outcome` is `:met` / `:failed` / `:undecided`.
+
 ### "Approvers should have a deadline" (timeouts)
 
 Give a step an SLA on its template — seconds it gets **once it becomes

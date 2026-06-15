@@ -11,6 +11,13 @@ module ApprovalEngine
     TERMINAL_STATUSES = %w[approved rejected quarantined cancelled].freeze
 
     belongs_to :target, polymorphic: true
+    # The rule that auto-routed this approval, when one did (nil for a manual
+    # run_approval!(templates:) start). Lets a host show *which* rule fired and
+    # why, and keeps that provenance stable even if the rule is later edited.
+    belongs_to :trigger_rule,
+               class_name: "ApprovalEngine::TriggerRule",
+               foreign_key: "approval_engine_trigger_rule_id",
+               optional: true
     has_many :tracks, class_name: "ApprovalEngine::Track", foreign_key: "approval_engine_approval_id", dependent: :destroy
     has_many :steps, through: :tracks
 

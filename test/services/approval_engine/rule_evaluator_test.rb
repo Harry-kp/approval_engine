@@ -22,6 +22,33 @@ module ApprovalEngine
       assert_equal "pending", approval.status
     end
 
+    test "records which rule matched as the approval's provenance" do
+      rule = create_rule(template: @template, condition: { ">" => [ { "var" => "amount" }, 5000 ] })
+
+      approval = evaluate("amount" => 6000)
+
+      assert_equal rule, approval.trigger_rule
+    end
+
+    test "provenance survives a later edit to the matched rule's condition" do
+      rule = create_rule(template: @template, condition: { ">" => [ { "var" => "amount" }, 5000 ] })
+      approval = evaluate("amount" => 6000)
+
+      rule.update!(condition: { ">" => [ { "var" => "amount" }, 1_000_000 ] })
+
+      assert_equal rule, approval.reload.trigger_rule,
+                   "the in-flight approval still points at the rule that routed it"
+    end
+
+    test "a quarantined approval carries no rule provenance" do
+      create_rule(template: @template, condition: { "bogus_operator" => [ 1, 2 ] })
+
+      approval = evaluate("amount" => 6000)
+
+      assert_equal "quarantined", approval.status
+      assert_nil approval.trigger_rule
+    end
+
     test "returns nil and builds nothing when no rule matches" do
       create_rule(template: @template, condition: { ">" => [ { "var" => "amount" }, 5000 ] })
 
