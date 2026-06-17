@@ -71,14 +71,9 @@ module ApprovalEngine
       tally_for(layer_steps)[:outcome]
     end
 
-    # The shared tally computation. The layer needs `required` approvals,
-    # computed from its `approvals_required` spec against the live group size
-    # (non-cancelled steps). It's met once enough have approved, and failed only
-    # once it's *unreachable* — i.e. even every approval still to come (pending
-    # AND not-yet-activated `waiting` steps) couldn't reach `required`. Counting
-    # waiting steps matters only for the public `layer_tally`, which can be asked
-    # about a layer that hasn't opened yet; `advance!` only ever evaluates the
-    # active layer, where there are no waiting steps, so its behaviour is unchanged.
+    # Met once `required` approvals are in; failed only once unreachable — even
+    # the steps still to come (pending + not-yet-opened `waiting`) couldn't reach
+    # it. advance! only sees the active layer, where waiting is 0, so it's unchanged.
     def tally_for(layer_steps)
       spec = layer_steps.first&.approvals_required
       return { required: 0, approved: 0, rejected: 0, pending: 0, waiting: 0, group_size: 0, outcome: :undecided } if spec.nil?
@@ -99,10 +94,8 @@ module ApprovalEngine
       { required: required, approved: approved, rejected: rejected, pending: pending, waiting: waiting, group_size: group, outcome: outcome }
     end
 
-    # This track's own consensus can no longer be reached: reject the track, then
-    # let the approval re-gather. Whether one rejected track sinks the whole
-    # approval is the gather's call now (immediate for `:all`, but a "2 of 3"
-    # gather can still resolve), not this track's to force.
+    # This track can't reach consensus: reject it, then let the approval
+    # re-gather (one rejected track no longer forces the whole approval down).
     def fail!
       update!(status: "rejected")
       cancel_open_steps!

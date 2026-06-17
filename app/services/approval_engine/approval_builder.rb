@@ -3,11 +3,8 @@ module ApprovalEngine
   # or more abstract TrackTemplates.
   #
   # A single template builds a single-track approval. Several templates build a
-  # scatter-gather approval: one parallel track per template (e.g.
-  # Legal + IT + Finance), all active at once. The approval gathers per its
-  # `approvals_required` consensus — `:all` by default (every track must approve,
-  # the historical behaviour), but `:any` / `:majority` / `"60%"` / a fixed count
-  # let a host express "2 of 3 departments must sign off".
+  # scatter-gather approval: one parallel track per template, all active at once,
+  # gathering per the approval's `approvals_required` (`:all` by default).
   #
   # Each template step is expanded into one Step per resolved actor — so "any
   # one of five senior devs" becomes five sibling steps sharing one consensus
@@ -24,10 +21,8 @@ module ApprovalEngine
       new(templates: [ template ], target: target, event_name: event_name, trigger_rule: trigger_rule).build!
     end
 
-    # Build a scatter-gather approval with one parallel track per template. No
-    # single rule routes a parallel run, so there's no provenance to record.
-    # `approvals_required` is the gather consensus across those tracks (default
-    # `:all` — every track must approve).
+    # Build a scatter-gather approval, one parallel track per template.
+    # `approvals_required` is the gather consensus (default `:all`).
     def self.build_parallel!(templates:, target:, event_name: nil, approvals_required: "all")
       raise BuilderError, "build_parallel! needs at least one template" if templates.blank?
 
@@ -135,9 +130,8 @@ module ApprovalEngine
                           "— it could never resolve."
     end
 
-    # The gather twin of guard_consensus!: a fixed count of track approvals that
-    # exceeds the number of tracks could never resolve. (Relative specs — :all,
-    # :majority, "60%" — are always satisfiable, like for layers.)
+    # The gather twin of guard_consensus!: a fixed count exceeding the track
+    # count could never resolve.
     def guard_gather_consensus!
       raise BuilderError, "approvals_required #{approvals_required.inspect} is not a valid consensus spec." unless Consensus.valid?(approvals_required)
 

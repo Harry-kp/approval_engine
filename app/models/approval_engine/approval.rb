@@ -1,15 +1,8 @@
 module ApprovalEngine
   # The aggregate root of one approval run: a host record + the event that
-  # spawned it, fanning out into one or more parallel tracks.
-  #
-  # The gather is consensus-aware: `approvals_required` says how many of the
-  # tracks must approve (`:all` by default — unanimity — but also `:any`,
-  # `:majority`, a percentage, or a fixed count, exactly like a layer). The
-  # approval approves once enough tracks have, and fails only once enough have
-  # hard-rejected that the target is unreachable — so one track saying no doesn't
-  # veto a "2 of 3 departments" gather. Progression methods here are always
-  # invoked while the approval row is locked by the acting step's transition, so
-  # they do not lock again themselves.
+  # spawned it, fanning out into one or more parallel tracks that gather per
+  # `approvals_required` (`:all` by default, like a layer). Progression methods
+  # run while the approval row is locked by the acting step, so they don't relock.
   class Approval < ApplicationRecord
     STATUSES = %w[pending approved rejected quarantined cancelled].freeze
     TERMINAL_STATUSES = %w[approved rejected quarantined cancelled].freeze
@@ -63,11 +56,8 @@ module ApprovalEngine
       steps.pending.order(:activated_at).first
     end
 
-    # Re-evaluate the gather after any track reaches a terminal outcome (a track
-    # approving via `complete!` or hard-rejecting via `fail!`). Approves once
-    # enough tracks have approved, fails once the required count is unreachable,
-    # and otherwise waits — the same met/failed/undecided logic a layer uses for
-    # its steps, applied across tracks. A no-op until something is decided.
+    # Re-evaluate after any track resolves: approve once enough tracks have,
+    # fail once the count is unreachable, else wait. A layer's logic, over tracks.
     def gather!
       return if terminal?
 
@@ -81,8 +71,7 @@ module ApprovalEngine
       end
     end
 
-    # Tear the whole approval down — the gather can no longer be satisfied (or a
-    # caller is hard-rejecting it). Cancels any tracks still open.
+    # Tear the whole approval down, cancelling any tracks still open.
     def reject!(reason: nil)
       return if terminal?
 
@@ -93,10 +82,7 @@ module ApprovalEngine
 
     private
 
-    # :met / :failed / :undecided for the gather. `required` tracks must approve,
-    # resolved from `approvals_required` against the live group (non-cancelled
-    # tracks). Met once enough have; failed once even every track still pending
-    # couldn't reach `required`; undecided otherwise.
+    # :met / :failed / :undecided across tracks — layer consensus, one level up.
     def track_outcome
       group = tracks.where.not(status: "cancelled").count
       return :undecided if group.zero?
