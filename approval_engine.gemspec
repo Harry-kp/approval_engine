@@ -27,6 +27,6 @@ Gem::Specification.new do |spec|
     Dir["{app,config,db,lib}/**/*", "MIT-LICENSE", "README.md", "CHANGELOG.md"].select { |f| File.file?(f) }
   end
 
-  spec.add_dependency "rails", ">= 7.0.8"
+  spec.add_dependency "rails", ">= 7.0.8", "< 9.0"
   spec.add_dependency "shiny_json_logic", "~> 0.3"
 end

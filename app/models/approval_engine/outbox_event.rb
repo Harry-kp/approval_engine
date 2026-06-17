@@ -13,8 +13,6 @@ module ApprovalEngine
     validates :tenant_id, :event_name, presence: true
 
     scope :unprocessed, -> { where(processed: false) }
-    scope :processed, -> { where(processed: true) }
-    scope :failed, -> { unprocessed.where.not(error_payload: nil) }
 
     # Relay the event once the producing transaction has safely committed.
     after_create_commit :enqueue_relay

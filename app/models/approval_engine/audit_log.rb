@@ -12,7 +12,6 @@ module ApprovalEngine
     validates :tenant_id, :event, presence: true
 
     scope :for_tenant, ->(tenant_id) { where(tenant_id: tenant_id) }
-    scope :recent, -> { order(created_at: :desc) }
 
     # True when the acting actor differed from the assigned one — i.e. a
     # delegate approved on someone's behalf. A system event (no actual actor) is

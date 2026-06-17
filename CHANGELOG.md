@@ -5,7 +5,9 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.0] - 2026-06-17
+
+First public release. The API below is stable.
 
 ### Added
 
@@ -120,4 +122,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A misconfigured `actor_class` now raises an actionable `BuilderError` naming
   the setting, instead of a raw `NameError`.
 
-[Unreleased]: https://github.com/Harry-kp/approval_engine/commits/main
+[1.0.0]: https://github.com/Harry-kp/approval_engine/releases/tag/v1.0.0

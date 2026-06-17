@@ -34,18 +34,6 @@ module ApprovalEngine
       assert_equal 200, exposure.serialize(Sample.new(amount: 100)).fetch("double")
     end
 
-    test "exposes a schema for UI rule builders" do
-      exposure = build do
-        attribute :amount, type: :decimal
-        attribute :department, type: :string
-      end
-
-      assert_equal(
-        [ { name: "amount", type: :decimal }, { name: "department", type: :string } ],
-        exposure.schema
-      )
-    end
-
     test "dup keeps attribute sets independent" do
       base = build { attribute :amount, type: :decimal }
       extended = base.dup

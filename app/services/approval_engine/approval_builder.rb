@@ -38,6 +38,7 @@ module ApprovalEngine
     end
 
     def build!
+      guard_single_tenant!
       guard_gather_consensus!
       ActiveRecord::Base.transaction do
         approval = build_approval
@@ -128,6 +129,15 @@ module ApprovalEngine
       raise BuilderError, "Step '#{tpl_step.name}' needs #{required} approval(s) but only " \
                           "#{actors.size} actor(s) resolved for group '#{tpl_step.assigned_group}' " \
                           "— it could never resolve."
+    end
+
+    # The approval and all its rows are stamped from one tenant; mixed-tenant
+    # templates would scatter a single ledger across tenants. Fail at the boundary.
+    def guard_single_tenant!
+      tenants = templates.map(&:tenant_id).uniq
+      return if tenants.size == 1
+
+      raise BuilderError, "all templates must belong to one tenant (got #{tenants.inspect})."
     end
 
     # The gather twin of guard_consensus!: a fixed count exceeding the track

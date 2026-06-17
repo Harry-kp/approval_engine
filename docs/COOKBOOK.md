@@ -456,7 +456,11 @@ end
 
 Other hooks: `after_rejected(reason)`, `after_step_approved(step)`,
 `after_step_rejected(step)`, `after_step_changes_requested(step)`,
-`on_quarantined(reason)`.
+`after_step_expired(step)`, `on_step_timeout(step)`, `on_quarantined(reason)`.
+
+Callbacks fire through the outbox: **at-least-once and unordered**. Make them
+idempotent, and don't assume one fires before another (e.g. `after_step_approved`
+before `after_approved`) — if you need ordering, derive it from the ledger.
 
 ### "Notify another system without coupling to my model"
 
@@ -617,7 +621,8 @@ These aren't overrides — you simply *define* them and the engine calls them
 (see [Side-effects & chaining](#side-effects--chaining)):
 `after_approved`, `after_rejected(reason)`,
 `on_quarantined(reason)`, `after_step_approved(step)`,
-`after_step_rejected(step)`, `after_step_changes_requested(step)`.
+`after_step_rejected(step)`, `after_step_changes_requested(step)`,
+`after_step_expired(step)`, `on_step_timeout(step)`.
 
 ---
 

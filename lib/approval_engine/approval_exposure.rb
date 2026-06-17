@@ -49,12 +49,6 @@ module ApprovalEngine
       @attributes.transform_values { |attr| coerce(attr.value_for(record), attr.type) }
     end
 
-    # A description of the exposed surface — useful for powering a UI rule
-    # builder (field names + types).
-    def schema
-      @attributes.values.map { |attr| { name: attr.name.to_s, type: attr.type } }
-    end
-
     private
 
     def coerce(value, type)

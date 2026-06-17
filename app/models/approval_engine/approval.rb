@@ -71,7 +71,10 @@ module ApprovalEngine
       end
     end
 
-    # Tear the whole approval down, cancelling any tracks still open.
+    private
+
+    # Internal: tear the whole approval down when the gather can't be satisfied.
+    # No actor, no audit row — hosts reject through a step (Step#reject!).
     def reject!(reason: nil)
       return if terminal?
 
@@ -79,8 +82,6 @@ module ApprovalEngine
       cancel_remaining_tracks!
       emit_outbox("approval.rejected", reason)
     end
-
-    private
 
     # :met / :failed / :undecided across tracks — layer consensus, one level up.
     def track_outcome

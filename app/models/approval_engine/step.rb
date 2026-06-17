@@ -40,11 +40,8 @@ module ApprovalEngine
     scope :waiting, -> { where(status: "waiting") }
     scope :pending, -> { where(status: "pending") }
     scope :approved, -> { where(status: "approved") }
-    scope :terminal, -> { where(status: TERMINAL_STATUSES) }
-    scope :resolved, -> { where.not(status: %w[waiting pending]) }
     scope :for_iteration, ->(iteration) { where(iteration: iteration) }
     scope :for_layer, ->(layer) { where(layer: layer) }
-    scope :assigned_to, ->(actor) { where(assigned_actor: actor) }
     scope :for_tenant, ->(tenant_id) { where(tenant_id: tenant_id) }
     # Pending steps whose deadline has passed and that haven't fired yet — the
     # set the timeout sweep acts on. Each step times out at most once.
@@ -150,6 +147,12 @@ module ApprovalEngine
       transition!(to: "expired", event: "expired", by: nil, comment: comment) do
         track.advance!(self)
       end
+    rescue ActiveRecord::RecordInvalid
+      # A human decided in the window between the guard above and the lock inside
+      # transition!. Their decision stands; expire! stays the no-op it advertises.
+      raise unless reload.terminal?
+
+      self
     end
 
     # Fire the timeout signal for every overdue step. Safe to run as often as you

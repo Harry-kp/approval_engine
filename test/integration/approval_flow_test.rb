@@ -172,7 +172,7 @@ module ApprovalEngine
       assert_equal "approved", approval.status
 
       assert_no_difference -> { OutboxEvent.count } do
-        approval.reject!(reason: "too late")
+        approval.send(:reject!, reason: "too late") # internal teardown; guarded by terminal?
       end
       assert_equal "approved", approval.reload.status, "already-approved approval is not re-rejected"
     end
@@ -394,6 +394,16 @@ module ApprovalEngine
         ApprovalBuilder.build_parallel!(templates: [ tpl ], target: @invoice, approvals_required: "3")
       end
       assert_match(/never resolve/, error.message)
+    end
+
+    test "build_parallel! refuses to scatter one approval across tenants" do
+      here  = create_template(event: "invoice.created", name: "A", steps: [ { group: "manager" } ])
+      there = create_template(event: "invoice.created", name: "B", tenant: "other-tenant", steps: [ { group: "manager" } ])
+
+      error = assert_raises(ApprovalBuilder::BuilderError) do
+        ApprovalBuilder.build_parallel!(templates: [ here, there ], target: @invoice)
+      end
+      assert_match(/one tenant/, error.message)
     end
 
     test "requesting changes appends a fresh iteration without erasing history" do

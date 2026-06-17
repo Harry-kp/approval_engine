@@ -1,4 +1,4 @@
-class AddApprovalsRequiredToApprovals < ActiveRecord::Migration[8.1]
+class AddApprovalsRequiredToApprovals < ActiveRecord::Migration[7.0]
   # The gather consensus: how many of an approval's parallel tracks must approve.
   # Defaults to "all" so existing approvals keep their unanimity behaviour.
   def change

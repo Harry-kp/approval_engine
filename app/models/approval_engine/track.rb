@@ -15,9 +15,6 @@ module ApprovalEngine
     validates :tenant_id, :name, presence: true
     validates :status, inclusion: { in: STATUSES }
 
-    scope :pending, -> { where(status: "pending") }
-    scope :approved, -> { where(status: "approved") }
-
     STATUSES.each do |state|
       define_method(:"#{state}?") { status == state }
     end

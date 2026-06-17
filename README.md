@@ -145,7 +145,8 @@ bin/console
 
 The mounted dashboard lists every approval, filters by status, and drills
 into tracks, steps, and the full audit trail. It is read-only, with
-bundled styling.
+bundled styling. It has no auth of its own — when you mount it in a real app,
+wrap it in a `constraints`/authenticated route ([recipe](docs/COOKBOOK.md#ui--monitoring)).
 
 ## Configuration
 
@@ -206,6 +207,9 @@ A missing attribute is a clean non-match, since JSON Logic treats it as
 `false`, so the approval just doesn’t start. Only a malformed rule, such
 as an unknown operator, quarantines. The approval never crashes either
 way. Set `config.raise_on_rule_errors = true` to surface errors loudly.
+
+For the full design — the model hierarchy, the consensus/rework model, and why
+the outbox exists — see **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 
 ## Development
 

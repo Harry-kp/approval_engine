@@ -22,10 +22,6 @@ module ApprovalEngine
       tenant_id ? scope.for_tenant(tenant_id) : scope
     end
 
-    def active_now?(at = Time.current)
-      active? && starts_at <= at && ends_at >= at
-    end
-
     private
 
     def ends_after_start
