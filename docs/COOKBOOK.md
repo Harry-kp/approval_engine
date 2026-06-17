@@ -688,12 +688,14 @@ consensus math:
 
 ```ruby
 track.layer_tally(1)
-# => { required: 2, approved: 1, rejected: 0, pending: 2,
+# => { required: 2, approved: 1, rejected: 0, pending: 2, waiting: 0,
 #      group_size: 3, outcome: :undecided }
 ```
 
 It defaults to the track's latest iteration; pass `iteration:` to read a
-specific rework round. `outcome` is `:met` / `:failed` / `:undecided`.
+specific rework round. `outcome` is `:met` / `:failed` / `:undecided` — and a
+layer that hasn't opened yet (all steps still `waiting`) reads `:undecided`, not
+`:failed`, since those `waiting` steps are still approvals waiting to happen.
 
 ### "Approvers should have a deadline" (timeouts)
 

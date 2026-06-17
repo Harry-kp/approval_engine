@@ -78,9 +78,18 @@ module ApprovalEngine
 
     test "an empty layer reads as a zeroed, undecided tally" do
       assert_equal(
-        { required: 0, approved: 0, rejected: 0, pending: 0, group_size: 0, outcome: :undecided },
+        { required: 0, approved: 0, rejected: 0, pending: 0, waiting: 0, group_size: 0, outcome: :undecided },
         @track.layer_tally(99)
       )
+    end
+
+    test "a layer that hasn't opened yet reads as undecided, not failed" do
+      seed_layer(:all, %w[waiting waiting], layer: 1)
+
+      tally = @track.layer_tally(1)
+      assert_equal :undecided, tally[:outcome], "an all-waiting layer is upcoming, not failed"
+      assert_equal 2, tally[:waiting]
+      assert_equal 0, tally[:approved]
     end
 
     test "defaults to the track's latest iteration" do
