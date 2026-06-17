@@ -67,20 +67,40 @@ module ApprovalEngine
         cancel_remaining_tracks!
         emit_outbox("approval.approved")
       when :failed
-        reject!(reason: "required track approvals are no longer reachable")
+        fail_gather!(reason: "required track approvals are no longer reachable")
       end
     end
 
-    # Tear the whole approval down, cancelling any tracks still open.
-    def reject!(reason: nil)
+    # Withdraw an in-flight approval — the third terminal outcome beside approved
+    # and rejected, for when the thing being approved is voided or retracted.
+    # Cancels any still-open tracks/steps and fires `after_cancelled`. A no-op
+    # once terminal. Unlike the gather, this is a host entry point, so it takes
+    # its own lock.
+    def cancel!(reason: nil)
+      return self if terminal?
+
+      with_lock do
+        return self if terminal?
+
+        update!(status: "cancelled")
+        cancel_remaining_tracks!
+        emit_outbox("approval.cancelled", reason)
+      end
+      self
+    end
+
+    private
+
+    # Internal: tear the whole approval down when the gather can't be satisfied
+    # (called from gather! under the step's lock). No actor, no audit row — hosts
+    # reject through a step (Step#reject!) or withdraw via cancel!.
+    def fail_gather!(reason: nil)
       return if terminal?
 
       update!(status: "rejected")
       cancel_remaining_tracks!
       emit_outbox("approval.rejected", reason)
     end
-
-    private
 
     # :met / :failed / :undecided across tracks — layer consensus, one level up.
     def track_outcome

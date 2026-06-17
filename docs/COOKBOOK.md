@@ -440,6 +440,35 @@ step.approve!(by: bob)    # audit records Alice as intended, Bob as actual
 
 ---
 
+## Withdrawing & escalating
+
+### "The requester retracted it / the PO was voided" (withdraw)
+
+`cancel!` is the third terminal outcome beside approved and rejected — for when
+the thing being approved no longer needs a decision. It cancels any open
+tracks/steps, leaves the history intact, and fires `after_cancelled(reason)`.
+
+```ruby
+approval.cancel!(reason: "Purchase order voided by requester")
+approval.status # => "cancelled"
+```
+
+### "This approver is unresponsive — hand it to someone else" (escalate)
+
+`reassign!` moves a *pending* step to another actor without restarting the flow.
+The reassignment is recorded on the ledger (original assignee as intended, the
+person who reassigned as actual), and the step stays pending in its layer. This
+is the natural partner to timeouts:
+
+```ruby
+def on_step_timeout(step)
+  step.reassign!(to: backup_for(step), by: nil, comment: "auto-escalated after SLA")
+  # ...or step.expire! to deny instead of escalate
+end
+```
+
+---
+
 ## Side-effects & chaining
 
 ### "Pay the invoice once it's fully approved" (chaining)
@@ -454,11 +483,20 @@ class Invoice < ApplicationRecord
 end
 ```
 
-Other hooks: `after_rejected(reason)`, `after_step_approved(step)`,
-`after_step_rejected(step)`, `after_step_changes_requested(step)`,
-`on_quarantined(reason)`.
+Other hooks: `after_rejected(reason)`, `after_cancelled(reason)`,
+`after_step_approved(step)`, `after_step_rejected(step)`,
+`after_step_changes_requested(step)`, `after_step_expired(step)`,
+`after_step_reassigned(step)`, `on_step_timeout(step)`, `on_quarantined(reason)`.
+
+Callbacks fire through the outbox: **at-least-once and unordered**. Make them
+idempotent, and don't assume one fires before another (e.g. `after_step_approved`
+before `after_approved`) — if you need ordering, derive it from the ledger.
 
 ### "Notify another system without coupling to my model"
+
+Prefer pub/sub to callbacks? Every outbox event is also an
+`ActiveSupport::Notifications` instrument named `approval_engine.<event_name>`,
+with payload keys `record`, `target`, and `tenant_id`:
 
 ```ruby
 ActiveSupport::Notifications.subscribe("approval_engine.approval.approved") do |*args|
@@ -466,6 +504,21 @@ ActiveSupport::Notifications.subscribe("approval_engine.approval.approved") do |
   AuditMailer.request_approved(event.payload[:target]).deliver_later
 end
 ```
+
+The full channel list:
+
+| Notification | Fires when |
+| --- | --- |
+| `approval_engine.approval.approved` | an approval gathers to approved |
+| `approval_engine.approval.rejected` | an approval is rejected |
+| `approval_engine.approval.cancelled` | an approval is withdrawn via `cancel!` |
+| `approval_engine.approval.quarantined` | a malformed rule quarantined the approval |
+| `approval_engine.step.approved` | a step is approved |
+| `approval_engine.step.rejected` | a step is rejected |
+| `approval_engine.step.changes_requested` | a step is sent back for rework |
+| `approval_engine.step.expired` | a step is expired (timed-out denial) |
+| `approval_engine.step.timed_out` | a step's SLA elapsed (signal only) |
+| `approval_engine.step.reassigned` | a step was handed to another actor |
 
 ### "If Stripe is down, the approve click shouldn't 500" (async safety)
 
@@ -615,9 +668,10 @@ end
 
 These aren't overrides — you simply *define* them and the engine calls them
 (see [Side-effects & chaining](#side-effects--chaining)):
-`after_approved`, `after_rejected(reason)`,
+`after_approved`, `after_rejected(reason)`, `after_cancelled(reason)`,
 `on_quarantined(reason)`, `after_step_approved(step)`,
-`after_step_rejected(step)`, `after_step_changes_requested(step)`.
+`after_step_rejected(step)`, `after_step_changes_requested(step)`,
+`after_step_expired(step)`, `after_step_reassigned(step)`, `on_step_timeout(step)`.
 
 ---
 

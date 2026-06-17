@@ -145,7 +145,8 @@ bin/console
 
 The mounted dashboard lists every approval, filters by status, and drills
 into tracks, steps, and the full audit trail. It is read-only, with
-bundled styling.
+bundled styling. It has no auth of its own — when you mount it in a real app,
+wrap it in a `constraints`/authenticated route ([recipe](docs/COOKBOOK.md#ui--monitoring)).
 
 ## Configuration
 
@@ -186,6 +187,18 @@ layers surface only when you need them, such as parallel tracks or the
 dashboard. For a single-track approval, `approval.track` and
 `approval.step` read it back without `.first`.
 
+`approvals_required` is one idea used at two levels: within a layer (how many of
+its steps), and across the parallel tracks of a scatter-gather (how many tracks
+must approve — `:all` by default). Beyond the happy path, an approval can be
+withdrawn (`approval.cancel!`) and a stuck step escalated (`step.reassign!`).
+
+**Reacting to outcomes** — define any of these on your model and the engine
+calls them (via the outbox, at-least-once and unordered): `after_approved`,
+`after_rejected(reason)`, `after_cancelled(reason)`, `on_quarantined(reason)`,
+`after_step_approved/rejected/changes_requested/expired/reassigned(step)`,
+`on_step_timeout(step)`. Or subscribe to the matching `approval_engine.*`
+[notifications](docs/COOKBOOK.md#notify-another-system-without-coupling-to-my-model).
+
 ## Cookbook
 
 See **[docs/COOKBOOK.md](docs/COOKBOOK.md)** for copy-paste recipes
@@ -206,6 +219,9 @@ A missing attribute is a clean non-match, since JSON Logic treats it as
 `false`, so the approval just doesn’t start. Only a malformed rule, such
 as an unknown operator, quarantines. The approval never crashes either
 way. Set `config.raise_on_rule_errors = true` to surface errors loudly.
+
+For the full design — the model hierarchy, the consensus/rework model, and why
+the outbox exists — see **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 
 ## Development
 

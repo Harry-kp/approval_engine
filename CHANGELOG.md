@@ -5,7 +5,9 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.0] - 2026-06-17
+
+First public release. The API below is stable.
 
 ### Added
 
@@ -73,6 +75,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   gather; a count that exceeds the number of tracks raises at build time.
 - Append-only "approval changes" cycles (`request_changes!`) that send an approval
   back for a fresh iteration while preserving history.
+- `approval.cancel!(reason:)` — withdraw an in-flight approval: the third terminal
+  outcome beside approved and rejected, for when the thing being approved is voided
+  or retracted. Cancels open tracks/steps, keeps history, fires `after_cancelled`.
+- `step.reassign!(to:, by:, comment:)` — hand a stuck step to another actor without
+  restarting the flow (the escalation partner to timeouts), recorded on the ledger
+  and firing `after_step_reassigned`.
+- `ApprovalEngine::Error` base class for every error the engine raises
+  (`BuilderError`, `EvaluationError` reparented), so a host can rescue one type.
 - Time-bound delegation with intended-vs-actual actor auditing.
 - Transactional outbox that relays host callbacks and
   `ActiveSupport::Notifications` asynchronously via ActiveJob.
@@ -109,7 +119,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Outbox relay now holds its row lock for the whole transaction (concurrent
   workers can't double-deliver), retries with backoff (`retry_on`), retires
   events whose target was purged instead of looping forever, and `drain!` skips
-  in-flight events. Host callbacks are at-least-once — make them idempotent.
+  in-flight events. Host callbacks are at-least-once and unordered — make them
+  idempotent. Exhausted retries now dead-letter the row (`failed_at`) so `drain!`
+  can't resurrect a poison event forever; delivery errors are recorded in a
+  separate `delivery_error` column so a retry never clobbers the semantic reason
+  (`error_payload`) the host callback reads; and the timeout sweep isolates a
+  single step's failure so it can't starve the rest of the batch.
 - Database `CHECK` constraints enforce every status and `approvals_required`
   value, so the ledger can't be corrupted by a raw write — not just Ruby
   validations.
@@ -120,4 +135,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A misconfigured `actor_class` now raises an actionable `BuilderError` naming
   the setting, instead of a raw `NameError`.
 
-[Unreleased]: https://github.com/Harry-kp/approval_engine/commits/main
+[1.0.0]: https://github.com/Harry-kp/approval_engine/releases/tag/v1.0.0

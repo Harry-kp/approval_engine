@@ -54,7 +54,32 @@ module ApprovalEngine
       end
 
       assert_not event.reload.processed, "event stays unprocessed for the retry"
-      assert_match(/Stripe is down/, event.error_payload, "the failure is recorded for ops")
+      assert_match(/Stripe is down/, event.delivery_error, "the failure is recorded for ops")
+      assert_nil event.failed_at, "still retrying, not yet dead-lettered"
+    end
+
+    test "a failed delivery never clobbers the semantic reason the callback reads" do
+      event = emit("approval.rejected", reason: "over budget")
+      original = Invoice.instance_method(:after_rejected)
+      Invoice.define_method(:after_rejected) { |_reason| raise "mailer down" }
+
+      ProcessOutboxJob.perform_now(event.id) # retry_on reschedules; doesn't raise out
+
+      event.reload
+      assert_equal "over budget", event.error_payload, "the host-facing reason survives"
+      assert_match(/mailer down/, event.delivery_error, "the trace goes to its own column")
+    ensure
+      # Restore the dummy's real callback — don't remove_method it, or later tests
+      # that depend on Invoice#after_rejected fail under an unlucky seed/order.
+      Invoice.define_method(:after_rejected, original) if original
+    end
+
+    test "drain! does not resurrect a dead-lettered event" do
+      event = emit("approval.approved")
+      event.update_columns(failed_at: Time.current, created_at: 5.minutes.ago)
+
+      assert_no_enqueued_jobs { OutboxEvent.drain! }
+      assert_includes OutboxEvent.failed, event
     end
 
     test "retires an event whose record was purged, rather than looping forever" do

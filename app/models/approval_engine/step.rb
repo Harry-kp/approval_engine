@@ -40,11 +40,8 @@ module ApprovalEngine
     scope :waiting, -> { where(status: "waiting") }
     scope :pending, -> { where(status: "pending") }
     scope :approved, -> { where(status: "approved") }
-    scope :terminal, -> { where(status: TERMINAL_STATUSES) }
-    scope :resolved, -> { where.not(status: %w[waiting pending]) }
     scope :for_iteration, ->(iteration) { where(iteration: iteration) }
     scope :for_layer, ->(layer) { where(layer: layer) }
-    scope :assigned_to, ->(actor) { where(assigned_actor: actor) }
     scope :for_tenant, ->(tenant_id) { where(tenant_id: tenant_id) }
     # Pending steps whose deadline has passed and that haven't fired yet — the
     # set the timeout sweep acts on. Each step times out at most once.
@@ -150,17 +147,47 @@ module ApprovalEngine
       transition!(to: "expired", event: "expired", by: nil, comment: comment) do
         track.advance!(self)
       end
+    rescue ActiveRecord::RecordInvalid
+      # A human decided in the window between the guard above and the lock inside
+      # transition!. Their decision stands; expire! stays the no-op it advertises.
+      raise unless reload.terminal?
+
+      self
+    end
+
+    # Hand a stuck step to another actor without restarting the flow — the
+    # escalation path for an unresponsive approver (e.g. from on_step_timeout).
+    # Records the reassignment (old assignee as intended, reassigner as actual)
+    # and keeps the step pending in its layer. Must be pending.
+    def reassign!(to:, by: nil, comment: nil)
+      track.approval.with_lock do
+        reload
+        unless pending?
+          errors.add(:status, "must be pending to reassign (was #{status})")
+          raise ActiveRecord::RecordInvalid, self
+        end
+
+        record_audit(event: "reassigned", by: by, comment: comment)
+        update!(assigned_actor: to)
+        emit_outbox("step.reassigned")
+      end
+      self
     end
 
     # Fire the timeout signal for every overdue step. Safe to run as often as you
     # like (each step times out once); scope to a tenant in multi-tenant cron.
-    # Returns the number swept. TimeoutSweepJob wraps this for background runs.
+    # Returns the number swept. One step raising (lock contention, a concurrently
+    # destroyed approval) is logged and skipped, so it can't starve the rest of
+    # the batch — the next sweep retries it (idempotent). TimeoutSweepJob wraps
+    # this for background runs.
     def self.sweep_timeouts!(tenant_id: nil)
       scope = tenant_id ? overdue.for_tenant(tenant_id) : overdue
       swept = 0
       scope.find_each do |step|
         step.time_out!
         swept += 1
+      rescue StandardError => e
+        Rails.logger&.warn("[ApprovalEngine] timeout sweep skipped step #{step.id}: #{e.class}: #{e.message}")
       end
       swept
     end

@@ -4,18 +4,23 @@ module ApprovalEngine
   # job only fires *side-effects*: optional host callbacks and an
   # ActiveSupport::Notifications instrumentation hook.
   #
-  # Delivery is *at-least-once*: host callbacks may run more than once if a
-  # worker dies mid-flight or the queue redelivers, so callbacks MUST be
-  # idempotent. The row is locked for the whole unit of work (inside a
-  # transaction) so two concurrent workers can't both deliver the same event,
-  # and a failure records the error before re-raising for backoff/retry.
+  # Delivery is *at-least-once* (host callbacks may run more than once on a
+  # redelivery, so they MUST be idempotent) and *unordered* (sibling events for
+  # one record aren't sequenced — don't assume after_step_approved precedes
+  # after_approved). The row is locked for the whole unit of work so two workers
+  # can't both deliver it. Retries are bounded; an exhausted event is dead-lettered
+  # (failed_at set) rather than retried forever.
   class ProcessOutboxJob < ApplicationJob
     # Read the queue lazily so the host isn't forced onto a queue name we picked.
     queue_as { ApprovalEngine.config.outbox_queue }
 
     # Don't depend on the host's adapter happening to retry: back off and retry
-    # here. A row whose argument can't be deserialised is a dead letter.
-    retry_on StandardError, wait: :polynomially_longer, attempts: 8
+    # here. When retries are exhausted, dead-letter the row (drain! then skips it)
+    # instead of re-raising into the host queue forever.
+    retry_on StandardError, wait: :polynomially_longer, attempts: 8 do |job, error|
+      id = job.arguments.first
+      OutboxEvent.where(id: id).update_all(failed_at: Time.current, delivery_error: job.class.format_error(error), updated_at: Time.current)
+    end
     discard_on ActiveJob::DeserializationError
 
     def perform(outbox_event_id)
@@ -29,8 +34,9 @@ module ApprovalEngine
         event.mark_processed!
       end
     rescue => e
-      # Persist the error outside the (rolled-back) transaction so ops can see it.
-      OutboxEvent.where(id: outbox_event_id).update_all(error_payload: format_error(e), updated_at: Time.current)
+      # Record the delivery failure (in its own column, so a retry never clobbers
+      # the semantic error_payload the host callback reads) and re-raise to retry.
+      OutboxEvent.where(id: outbox_event_id).update_all(delivery_error: self.class.format_error(e), updated_at: Time.current)
       raise
     end
 
@@ -54,8 +60,10 @@ module ApprovalEngine
       when "step.changes_requested"    then try_call(target, :after_step_changes_requested, record)
       when "step.timed_out"            then try_call(target, :on_step_timeout, record)
       when "step.expired"              then try_call(target, :after_step_expired, record)
+      when "step.reassigned"           then try_call(target, :after_step_reassigned, record)
       when "approval.approved"         then try_call(target, :after_approved)
       when "approval.rejected"         then try_call(target, :after_rejected, event.error_payload)
+      when "approval.cancelled"        then try_call(target, :after_cancelled, event.error_payload)
       when "approval.quarantined"      then try_call(target, :on_quarantined, event.error_payload)
       end
     end
@@ -83,7 +91,9 @@ module ApprovalEngine
       target.public_send(method_name, *args) if target.respond_to?(method_name)
     end
 
-    def format_error(error)
+    # Class method so the retry-exhausted block (which runs without a job
+    # instance receiver) can reuse it.
+    def self.format_error(error)
       "#{error.class}: #{error.message}\n#{Array(error.backtrace).first(5).join("\n")}"
     end
   end

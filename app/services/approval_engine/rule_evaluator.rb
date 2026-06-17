@@ -19,7 +19,7 @@ module ApprovalEngine
   # failure, or nil when no rule matched. `preview` runs the identical matching
   # logic but writes nothing — see ApprovalPlan.
   class RuleEvaluator
-    class EvaluationError < StandardError; end
+    class EvaluationError < ApprovalEngine::Error; end
 
     def self.call(event_name:, tenant_id:, target:, payload:)
       new(event_name: event_name, tenant_id: tenant_id, target: target, payload: payload).call
@@ -106,6 +106,9 @@ module ApprovalEngine
     end
 
     def quarantine(_rule)
+      # Quarantine is fail-closed and async (host hears via on_quarantined); log
+      # too, so a systematic rule bug is visible without inspecting rows.
+      Rails.logger&.warn("[ApprovalEngine] quarantined #{target.class}##{target.id} (#{tenant_id}): #{@failure_reason}")
       ApprovalBuilder.build_quarantine_approval!(
         target: target,
         tenant_id: tenant_id,
