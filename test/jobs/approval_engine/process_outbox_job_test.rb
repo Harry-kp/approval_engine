@@ -60,6 +60,7 @@ module ApprovalEngine
 
     test "a failed delivery never clobbers the semantic reason the callback reads" do
       event = emit("approval.rejected", reason: "over budget")
+      original = Invoice.instance_method(:after_rejected)
       Invoice.define_method(:after_rejected) { |_reason| raise "mailer down" }
 
       ProcessOutboxJob.perform_now(event.id) # retry_on reschedules; doesn't raise out
@@ -68,7 +69,9 @@ module ApprovalEngine
       assert_equal "over budget", event.error_payload, "the host-facing reason survives"
       assert_match(/mailer down/, event.delivery_error, "the trace goes to its own column")
     ensure
-      Invoice.remove_method(:after_rejected) if Invoice.method_defined?(:after_rejected)
+      # Restore the dummy's real callback — don't remove_method it, or later tests
+      # that depend on Invoice#after_rejected fail under an unlucky seed/order.
+      Invoice.define_method(:after_rejected, original) if original
     end
 
     test "drain! does not resurrect a dead-lettered event" do
