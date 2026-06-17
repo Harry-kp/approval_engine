@@ -89,12 +89,14 @@ module ApprovalEngine
     # With `templates:`, rule evaluation is skipped and exactly those templates
     # are started (several become parallel tracks of one approval); always
     # returns the spawned approval. Pair with `approval_candidates` to let a user
-    # choose instead of the engine.
-    def run_approval!(event: nil, templates: nil, tenant_id: approval_tenant_id)
+    # choose instead of the engine. `approvals_required` is the gather consensus
+    # across those tracks (default `:all` — every track must approve; pass e.g.
+    # `"2"` or `:majority` for "2 of 3 departments must sign off").
+    def run_approval!(event: nil, templates: nil, approvals_required: "all", tenant_id: approval_tenant_id)
       raise ArgumentError, "pass either event: or templates:, not both" if event && templates
 
       if templates
-        ApprovalEngine::ApprovalBuilder.build_parallel!(templates: Array(templates), target: self)
+        ApprovalEngine::ApprovalBuilder.build_parallel!(templates: Array(templates), target: self, approvals_required: approvals_required)
       elsif event
         return if tenant_id.nil?
 

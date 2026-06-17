@@ -347,6 +347,55 @@ module ApprovalEngine
       assert_equal "approved", Approval.find(approval.id).status, "gathers once every track approves"
     end
 
+    # The gather is consensus-aware, exactly like a layer: "2 of 3 departments".
+    def three_department_approval(approvals_required:)
+      %i[legal it finance].each { |r| create_user(role: r) }
+      tpls = %i[legal it finance].map { |r| create_template(event: "invoice.created", name: r.to_s, steps: [ { group: r.to_s } ]) }
+      ApprovalBuilder.build_parallel!(templates: tpls, target: @invoice, approvals_required: approvals_required)
+    end
+
+    test "counted gather: approves once enough tracks approve, cancelling the rest" do
+      approval = three_department_approval(approvals_required: "2")
+
+      approval.steps.where(assigned_actor: User.find_by(role: "legal")).first.approve!(by: User.find_by(role: "legal"))
+      assert_equal "pending", Approval.find(approval.id).status, "one of two — still gathering"
+
+      approval.steps.where(assigned_actor: User.find_by(role: "it")).first.approve!(by: User.find_by(role: "it"))
+      approval = Approval.find(approval.id)
+      assert_equal "approved", approval.status, "two approvals reach the count"
+      assert_equal 1, approval.tracks.where(status: "cancelled").count, "the finance track is no longer needed"
+    end
+
+    test "counted gather: one rejected track does not veto a still-reachable count" do
+      approval = three_department_approval(approvals_required: "2")
+
+      approval.steps.where(assigned_actor: User.find_by(role: "legal")).first.reject!(by: User.find_by(role: "legal"))
+      assert_equal "pending", Approval.find(approval.id).status, "IT + Finance can still reach 2 — not a veto"
+
+      approval.steps.where(assigned_actor: User.find_by(role: "it")).first.approve!(by: User.find_by(role: "it"))
+      approval.steps.where(assigned_actor: User.find_by(role: "finance")).first.approve!(by: User.find_by(role: "finance"))
+      assert_equal "approved", Approval.find(approval.id).status
+    end
+
+    test "counted gather: fails once the required count becomes unreachable" do
+      approval = three_department_approval(approvals_required: "2")
+
+      approval.steps.where(assigned_actor: User.find_by(role: "legal")).first.reject!(by: User.find_by(role: "legal"))
+      approval.steps.where(assigned_actor: User.find_by(role: "it")).first.reject!(by: User.find_by(role: "it"))
+
+      assert_equal "rejected", Approval.find(approval.id).status, "only finance left — 2 is unreachable"
+    end
+
+    test "a gather count exceeding the number of tracks is rejected at build time" do
+      create_user(role: :legal)
+      tpl = create_template(event: "invoice.created", name: "Legal", steps: [ { group: "legal" } ])
+
+      error = assert_raises(ApprovalBuilder::BuilderError) do
+        ApprovalBuilder.build_parallel!(templates: [ tpl ], target: @invoice, approvals_required: "3")
+      end
+      assert_match(/never resolve/, error.message)
+    end
+
     test "requesting changes appends a fresh iteration without erasing history" do
       create_user(role: :manager)
       template = create_template(event: "invoice.created", steps: [ { group: "manager" } ])

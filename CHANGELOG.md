@@ -64,7 +64,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   than vetoing on the first no. A failed layer never advances.
 - Sequential multi-layer tracks with automatic layer activation.
 - Scatter-gather parallel tracks via `ApprovalBuilder.build_parallel!` — one
-  approval gathers across several simultaneous tracks.
+  approval gathers across several simultaneous tracks. The gather is
+  consensus-aware: `approvals_required` (on `build_parallel!` /
+  `run_approval!(templates:, approvals_required:)`) says how many tracks must
+  approve — `:all` by default (unanimity, the historical behaviour), but also
+  `:any` / `:majority` / `"60%"` / a fixed count, so "2 of 3 departments must
+  sign off" is expressible. One track rejecting no longer vetoes a still-reachable
+  gather; a count that exceeds the number of tracks raises at build time.
 - Append-only "approval changes" cycles (`request_changes!`) that send an approval
   back for a fresh iteration while preserving history.
 - Time-bound delegation with intended-vs-actual actor auditing.

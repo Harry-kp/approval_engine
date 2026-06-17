@@ -99,11 +99,14 @@ module ApprovalEngine
       { required: required, approved: approved, rejected: rejected, pending: pending, waiting: waiting, group_size: group, outcome: outcome }
     end
 
-    # Consensus can no longer be reached: tear the track (and approval) down.
+    # This track's own consensus can no longer be reached: reject the track, then
+    # let the approval re-gather. Whether one rejected track sinks the whole
+    # approval is the gather's call now (immediate for `:all`, but a "2 of 3"
+    # gather can still resolve), not this track's to force.
     def fail!
       update!(status: "rejected")
       cancel_open_steps!
-      approval.reject!(reason: "Track '#{name}' did not reach consensus")
+      approval.gather!
     end
 
     # Activate the next *existing* layer above this one — not blindly layer + 1 —
@@ -120,7 +123,7 @@ module ApprovalEngine
 
     def complete!
       update!(status: "approved")
-      approval.try_complete!
+      approval.gather!
     end
 
     def cancel_open_steps!
