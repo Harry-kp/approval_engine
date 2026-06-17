@@ -33,7 +33,7 @@
 * **Zero External Dependencies:** Do not force Redis or Sidekiq. Rely strictly on `ActiveJob` for background processing.
 * **Race-Condition Immunity:** Utilize database-level pessimistic locking (`lock!`) during state transitions to prevent double-approvals.
 * **Cryptographic-Style Auditability:** Maintain an append-only `AuditLogs` table tracking `intended_actor` vs. `actual_actor` for strict compliance.
-* **Safe Failures (Fail Closed):** If a dynamic rule tries to evaluate a missing payload key, quarantine the approval into a "System Failure" state rather than crashing the web worker.
+* **Safe Failures (Fail Closed):** A *missing* payload key is a clean non-match (JSON Logic treats it as false), so the approval simply doesn't start. Only a *malformed* rule (e.g. an unknown operator) quarantines the approval into a "System Failure" state, rather than crashing the web worker.
 * **Developer Ergonomics (Omakase):** No heavy Service Objects. Use Rich ActiveRecord models, bang methods, and conventional callbacks.
 
 ---
@@ -124,7 +124,7 @@
 
 
 14. **Graceful Rule Failure:** "As an Ops team, if we typo a variable in our custom rule, the app shouldn't crash."
-* *Solution:* Evaluator rescues missing keys and forces a safe "System Quarantined" approval state.
+* *Solution:* A missing key is a clean non-match; a *malformed* rule is rescued and forced into a safe "System Quarantined" approval state (logged for ops).
 
 
 15. **Queue Agnosticism:** "As a Startup, we use SolidQueue, not Sidekiq."

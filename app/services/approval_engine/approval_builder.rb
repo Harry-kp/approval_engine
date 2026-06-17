@@ -11,7 +11,7 @@ module ApprovalEngine
   # policy. Only each track's first layer starts `pending`; later layers wait
   # until the layer before them resolves.
   class ApprovalBuilder
-    class BuilderError < StandardError; end
+    class BuilderError < ApprovalEngine::Error; end
 
     # Build a single-track approval from one template. `event_name` is the event
     # that triggered this run (nil when started manually) — recorded on the

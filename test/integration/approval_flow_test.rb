@@ -172,7 +172,7 @@ module ApprovalEngine
       assert_equal "approved", approval.status
 
       assert_no_difference -> { OutboxEvent.count } do
-        approval.send(:reject!, reason: "too late") # internal teardown; guarded by terminal?
+        approval.send(:fail_gather!, reason: "too late") # internal teardown; guarded by terminal?
       end
       assert_equal "approved", approval.reload.status, "already-approved approval is not re-rejected"
     end
@@ -404,6 +404,70 @@ module ApprovalEngine
         ApprovalBuilder.build_parallel!(templates: [ here, there ], target: @invoice)
       end
       assert_match(/one tenant/, error.message)
+    end
+
+    test "cancel! withdraws an in-flight approval and cancels its open steps" do
+      create_user(role: :manager)
+      template = create_template(event: "invoice.created", steps: [ { group: "manager" } ])
+      create_rule(template: template, condition: { ">" => [ { "var" => "amount" }, 0 ] })
+      route!
+      approval = Approval.first
+      step = pending_step_for(:manager)
+
+      approval.cancel!(reason: "PO voided")
+
+      assert_equal "cancelled", approval.reload.status
+      assert_equal "cancelled", step.reload.status, "open steps are cancelled too"
+      assert OutboxEvent.exists?(event_name: "approval.cancelled"), "fires the cancellation event"
+    end
+
+    test "cancel! is a no-op once the approval is terminal" do
+      create_user(role: :manager)
+      template = create_template(event: "invoice.created", steps: [ { group: "manager" } ])
+      create_rule(template: template, condition: { ">" => [ { "var" => "amount" }, 0 ] })
+      route!
+      pending_step_for(:manager).approve!(by: User.find_by(role: "manager"))
+      approval = Approval.first
+
+      assert_no_difference -> { OutboxEvent.count } do
+        approval.cancel!(reason: "too late")
+      end
+      assert_equal "approved", approval.reload.status
+    end
+
+    test "reassign! hands a pending step to another actor, audited, still pending" do
+      manager = create_user(role: :manager)
+      backup  = create_user(role: :backup)
+      template = create_template(event: "invoice.created", steps: [ { group: "manager" } ])
+      create_rule(template: template, condition: { ">" => [ { "var" => "amount" }, 0 ] })
+      route!
+      step = pending_step_for(:manager)
+
+      step.reassign!(to: backup, by: manager, comment: "covering while away")
+
+      step.reload
+      assert_equal backup, step.assigned_actor
+      assert_equal "pending", step.status, "reassignment doesn't resolve the step"
+      assert step.actionable_by?(backup)
+      assert_equal "reassigned", step.audit_logs.order(:created_at).last.event
+      assert OutboxEvent.exists?(event_name: "step.reassigned")
+    end
+
+    test "reassign! refuses a step that is no longer pending" do
+      manager = create_user(role: :manager)
+      backup  = create_user(role: :backup)
+      template = create_template(event: "invoice.created", steps: [ { group: "manager" } ])
+      create_rule(template: template, condition: { ">" => [ { "var" => "amount" }, 0 ] })
+      route!
+      step = pending_step_for(:manager)
+      step.approve!(by: manager)
+
+      assert_raises(ActiveRecord::RecordInvalid) { step.reassign!(to: backup) }
+    end
+
+    test "engine errors share one rescue point under ApprovalEngine::Error" do
+      assert ApprovalBuilder::BuilderError < ApprovalEngine::Error
+      assert RuleEvaluator::EvaluationError < ApprovalEngine::Error
     end
 
     test "requesting changes appends a fresh iteration without erasing history" do

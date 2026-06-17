@@ -13,6 +13,10 @@ module ApprovalEngine
     validates :tenant_id, :event_name, presence: true
 
     scope :unprocessed, -> { where(processed: false) }
+    # Dead letters: delivery retries were exhausted. Excluded from drain! so a
+    # permanently-failing callback isn't resurrected forever; surfaced here for
+    # ops to inspect and replay (clear failed_at to let drain! pick it up again).
+    scope :failed, -> { where.not(failed_at: nil) }
 
     # Relay the event once the producing transaction has safely committed.
     after_create_commit :enqueue_relay
@@ -20,15 +24,18 @@ module ApprovalEngine
     # Safety net for events whose relay job was lost (e.g. the process died
     # between commit and enqueue). Wire this to a periodic ActiveJob/cron.
     # `older_than` skips freshly-created events whose relay is likely still
-    # in-flight, so draining never double-enqueues a healthy event.
+    # in-flight, so draining never double-enqueues a healthy event; dead letters
+    # are skipped so exhausted poison events aren't retried in perpetuity.
     def self.drain!(older_than: 1.minute, limit: 1000)
-      unprocessed.where(created_at: ..older_than.ago).order(:created_at).limit(limit).pluck(:id).each do |id|
+      unprocessed.where(failed_at: nil)
+                 .where(created_at: ..older_than.ago)
+                 .order(:created_at).limit(limit).pluck(:id).each do |id|
         ProcessOutboxJob.perform_later(id)
       end
     end
 
     def mark_processed!
-      update!(processed: true, processed_at: Time.current, error_payload: nil)
+      update!(processed: true, processed_at: Time.current, error_payload: nil, delivery_error: nil)
     end
 
     private

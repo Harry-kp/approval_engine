@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_17_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_17_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -68,8 +68,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_17_000001) do
 
   create_table "approval_engine_outbox_events", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.text "delivery_error"
     t.text "error_payload"
     t.string "event_name", null: false
+    t.datetime "failed_at"
     t.boolean "processed", default: false, null: false
     t.datetime "processed_at"
     t.uuid "record_id", null: false
