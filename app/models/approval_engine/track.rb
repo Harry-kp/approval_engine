@@ -52,11 +52,12 @@ module ApprovalEngine
     # re-deriving the consensus math (which only the engine should own).
     #
     #   track.layer_tally(1)
-    #   # => { required: 2, approved: 1, rejected: 0, pending: 2,
+    #   # => { required: 2, approved: 1, rejected: 0, pending: 2, waiting: 0,
     #   #      group_size: 3, outcome: :undecided }
     #
-    # Defaults to the track's latest iteration. Returns a zeroed tally with
-    # `outcome: :undecided` for a layer that has no steps.
+    # Defaults to the track's latest iteration. A layer that hasn't opened yet
+    # (all steps still `waiting`) reads as `:undecided`, not `:failed`. Returns a
+    # zeroed `:undecided` tally for a layer that has no steps.
     def layer_tally(layer, iteration: steps.maximum(:iteration))
       tally_for(steps.for_iteration(iteration).for_layer(layer))
     end
@@ -70,34 +71,35 @@ module ApprovalEngine
       tally_for(layer_steps)[:outcome]
     end
 
-    # The shared tally computation. The layer needs `required` approvals,
-    # computed from its `approvals_required` spec against the live group size
-    # (non-cancelled steps). It's met once enough have approved, and failed once
-    # even all the still-pending steps couldn't reach `required`.
+    # Met once `required` approvals are in; failed only once unreachable — even
+    # the steps still to come (pending + not-yet-opened `waiting`) couldn't reach
+    # it. advance! only sees the active layer, where waiting is 0, so it's unchanged.
     def tally_for(layer_steps)
       spec = layer_steps.first&.approvals_required
-      return { required: 0, approved: 0, rejected: 0, pending: 0, group_size: 0, outcome: :undecided } if spec.nil?
+      return { required: 0, approved: 0, rejected: 0, pending: 0, waiting: 0, group_size: 0, outcome: :undecided } if spec.nil?
 
       approved = layer_steps.approved.count
       pending  = layer_steps.pending.count
+      waiting  = layer_steps.waiting.count
       rejected = layer_steps.where(status: "rejected").count
       group    = layer_steps.where.not(status: "cancelled").count
       required = Consensus.new(spec).required(group)
 
       outcome =
         if approved >= required then :met
-        elsif (approved + pending) < required then :failed
+        elsif (approved + pending + waiting) < required then :failed
         else :undecided
         end
 
-      { required: required, approved: approved, rejected: rejected, pending: pending, group_size: group, outcome: outcome }
+      { required: required, approved: approved, rejected: rejected, pending: pending, waiting: waiting, group_size: group, outcome: outcome }
     end
 
-    # Consensus can no longer be reached: tear the track (and approval) down.
+    # This track can't reach consensus: reject it, then let the approval
+    # re-gather (one rejected track no longer forces the whole approval down).
     def fail!
       update!(status: "rejected")
       cancel_open_steps!
-      approval.reject!(reason: "Track '#{name}' did not reach consensus")
+      approval.gather!
     end
 
     # Activate the next *existing* layer above this one — not blindly layer + 1 —
@@ -114,7 +116,7 @@ module ApprovalEngine
 
     def complete!
       update!(status: "approved")
-      approval.try_complete!
+      approval.gather!
     end
 
     def cancel_open_steps!

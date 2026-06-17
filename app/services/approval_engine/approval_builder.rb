@@ -3,10 +3,8 @@ module ApprovalEngine
   # or more abstract TrackTemplates.
   #
   # A single template builds a single-track approval. Several templates build a
-  # scatter-gather approval: one parallel track per template (e.g.
-  # Legal + IT + Finance), all active at once. The approval gathers — it is
-  # approved once every track approves, and torn down the moment any track is
-  # hard-rejected.
+  # scatter-gather approval: one parallel track per template, all active at once,
+  # gathering per the approval's `approvals_required` (`:all` by default).
   #
   # Each template step is expanded into one Step per resolved actor — so "any
   # one of five senior devs" becomes five sibling steps sharing one consensus
@@ -23,22 +21,24 @@ module ApprovalEngine
       new(templates: [ template ], target: target, event_name: event_name, trigger_rule: trigger_rule).build!
     end
 
-    # Build a scatter-gather approval with one parallel track per template. No
-    # single rule routes a parallel run, so there's no provenance to record.
-    def self.build_parallel!(templates:, target:, event_name: nil)
+    # Build a scatter-gather approval, one parallel track per template.
+    # `approvals_required` is the gather consensus (default `:all`).
+    def self.build_parallel!(templates:, target:, event_name: nil, approvals_required: "all")
       raise BuilderError, "build_parallel! needs at least one template" if templates.blank?
 
-      new(templates: templates, target: target, event_name: event_name).build!
+      new(templates: templates, target: target, event_name: event_name, approvals_required: approvals_required).build!
     end
 
-    def initialize(templates:, target:, event_name: nil, trigger_rule: nil)
-      @templates    = templates
-      @target       = target
-      @event_name   = event_name
-      @trigger_rule = trigger_rule
+    def initialize(templates:, target:, event_name: nil, trigger_rule: nil, approvals_required: "all")
+      @templates           = templates
+      @target              = target
+      @event_name          = event_name
+      @trigger_rule        = trigger_rule
+      @approvals_required  = approvals_required.to_s
     end
 
     def build!
+      guard_gather_consensus!
       ActiveRecord::Base.transaction do
         approval = build_approval
         templates.each { |template| build_track!(approval, template) }
@@ -61,7 +61,7 @@ module ApprovalEngine
 
     private
 
-    attr_reader :templates, :target, :event_name, :trigger_rule
+    attr_reader :templates, :target, :event_name, :trigger_rule, :approvals_required
 
     def build_approval
       Approval.create!(
@@ -69,7 +69,8 @@ module ApprovalEngine
         target: target,
         status: "pending",
         event_name: event_name,
-        trigger_rule: trigger_rule
+        trigger_rule: trigger_rule,
+        approvals_required: approvals_required
       )
     end
 
@@ -127,6 +128,18 @@ module ApprovalEngine
       raise BuilderError, "Step '#{tpl_step.name}' needs #{required} approval(s) but only " \
                           "#{actors.size} actor(s) resolved for group '#{tpl_step.assigned_group}' " \
                           "— it could never resolve."
+    end
+
+    # The gather twin of guard_consensus!: a fixed count exceeding the track
+    # count could never resolve.
+    def guard_gather_consensus!
+      raise BuilderError, "approvals_required #{approvals_required.inspect} is not a valid consensus spec." unless Consensus.valid?(approvals_required)
+
+      required = Consensus.new(approvals_required).required(templates.size)
+      return if required <= templates.size
+
+      raise BuilderError, "approval needs #{required} track approval(s) but only #{templates.size} " \
+                          "track(s) were given — it could never resolve."
     end
 
     def host_actor_resolver

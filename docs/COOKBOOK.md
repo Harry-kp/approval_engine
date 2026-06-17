@@ -400,8 +400,27 @@ ApprovalEngine::ApprovalBuilder.build_parallel!(
 )
 ```
 
-One approval, two tracks running at once. It's approved when both tracks
-approve and torn down if either is hard-rejected.
+One approval, two tracks running at once. By default it's approved when *both*
+tracks approve and torn down if either is hard-rejected.
+
+### "Any 2 of our 3 regional offices must sign off" (gather consensus)
+
+The gather takes the same `approvals_required` vocabulary a layer does — so
+"all tracks" is just the default, not the only option:
+
+```ruby
+ApprovalEngine::ApprovalBuilder.build_parallel!(
+  templates: [emea_template, apac_template, amer_template],
+  target: contract,
+  approvals_required: "2"   # :any / :all / :majority / "60%" / a count
+)
+# or, from the host record:
+contract.run_approval!(templates: [emea, apac, amer], approvals_required: :majority)
+```
+
+Now one office rejecting doesn't veto the deal — the approval keeps gathering as
+long as the count is still reachable, and only fails once it isn't. A fixed count
+larger than the number of tracks raises at build time (it could never resolve).
 
 ---
 
@@ -688,12 +707,14 @@ consensus math:
 
 ```ruby
 track.layer_tally(1)
-# => { required: 2, approved: 1, rejected: 0, pending: 2,
+# => { required: 2, approved: 1, rejected: 0, pending: 2, waiting: 0,
 #      group_size: 3, outcome: :undecided }
 ```
 
 It defaults to the track's latest iteration; pass `iteration:` to read a
-specific rework round. `outcome` is `:met` / `:failed` / `:undecided`.
+specific rework round. `outcome` is `:met` / `:failed` / `:undecided` — and a
+layer that hasn't opened yet (all steps still `waiting`) reads `:undecided`, not
+`:failed`, since those `waiting` steps are still approvals waiting to happen.
 
 ### "Approvers should have a deadline" (timeouts)
 

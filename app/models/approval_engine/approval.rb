@@ -1,11 +1,8 @@
 module ApprovalEngine
   # The aggregate root of one approval run: a host record + the event that
-  # spawned it, fanning out into one or more parallel tracks.
-  #
-  # An approval is approved only once *every* track approves (scatter-gather),
-  # and rejected the moment any single track is hard-rejected. Progression
-  # methods here are always invoked while the approval row is locked by the
-  # acting step's transition, so they do not lock again themselves.
+  # spawned it, fanning out into one or more parallel tracks that gather per
+  # `approvals_required` (`:all` by default, like a layer). Progression methods
+  # run while the approval row is locked by the acting step, so they don't relock.
   class Approval < ApplicationRecord
     STATUSES = %w[pending approved rejected quarantined cancelled].freeze
     TERMINAL_STATUSES = %w[approved rejected quarantined cancelled].freeze
@@ -23,6 +20,7 @@ module ApprovalEngine
 
     validates :tenant_id, presence: true
     validates :status, inclusion: { in: STATUSES }
+    validate :approvals_required_is_valid
 
     scope :pending, -> { where(status: "pending") }
     scope :quarantined, -> { where(status: "quarantined") }
@@ -58,17 +56,22 @@ module ApprovalEngine
       steps.pending.order(:activated_at).first
     end
 
-    # Called as each track completes. The approval approves once no track
-    # is left unapproved.
-    def try_complete!
+    # Re-evaluate after any track resolves: approve once enough tracks have,
+    # fail once the count is unreachable, else wait. A layer's logic, over tracks.
+    def gather!
       return if terminal?
-      return if tracks.where.not(status: "approved").exists?
 
-      update!(status: "approved")
-      emit_outbox("approval.approved")
+      case track_outcome
+      when :met
+        update!(status: "approved")
+        cancel_remaining_tracks!
+        emit_outbox("approval.approved")
+      when :failed
+        reject!(reason: "required track approvals are no longer reachable")
+      end
     end
 
-    # A track was hard-rejected: tear the whole approval down.
+    # Tear the whole approval down, cancelling any tracks still open.
     def reject!(reason: nil)
       return if terminal?
 
@@ -78,6 +81,27 @@ module ApprovalEngine
     end
 
     private
+
+    # :met / :failed / :undecided across tracks — layer consensus, one level up.
+    def track_outcome
+      group = tracks.where.not(status: "cancelled").count
+      return :undecided if group.zero?
+
+      approved = tracks.where(status: "approved").count
+      pending  = tracks.where(status: "pending").count
+      required = Consensus.new(approvals_required).required(group)
+
+      if approved >= required then :met
+      elsif (approved + pending) < required then :failed
+      else :undecided
+      end
+    end
+
+    def approvals_required_is_valid
+      return if Consensus.valid?(approvals_required)
+
+      errors.add(:approvals_required, "must be :any, :all, :majority, a percentage like \"60%\", or a positive integer")
+    end
 
     def cancel_remaining_tracks!
       tracks.where(status: %w[pending]).find_each do |track|

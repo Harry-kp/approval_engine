@@ -4,10 +4,10 @@ module ApprovalEngine
   # crashing mailer or a down payment API can never roll back an approval, and
   # no side-effect is ever silently lost.
   class OutboxEvent < ApplicationRecord
-    # `record` is always an engine row (an Approval or Step, both UUID-keyed) —
-    # never a host record — which is why record_id is typed uuid. optional: a
-    # target may have been destroyed by the time we relay; such an event is
-    # retired (marked processed) rather than becoming a poison message.
+    # `record` is always an engine row (Approval or Step, UUID-keyed), never a
+    # host record. The column is NOT NULL — every event is created with one — but
+    # `optional: true` relaxes the load-time check so an event whose record was
+    # destroyed before relay can be retired instead of poisoning the queue.
     belongs_to :record, polymorphic: true, optional: true
 
     validates :tenant_id, :event_name, presence: true
