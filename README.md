@@ -1,5 +1,7 @@
 # ApprovalEngine
 
+[![Gem Version](https://img.shields.io/gem/v/approval_engine?logo=rubygems&color=E9573F)](https://rubygems.org/gems/approval_engine)
+[![Downloads](https://img.shields.io/gem/dt/approval_engine?logo=rubygems&color=blue)](https://rubygems.org/gems/approval_engine)
 [![CI](https://github.com/Harry-kp/approval_engine/actions/workflows/ci.yml/badge.svg)](https://github.com/Harry-kp/approval_engine/actions/workflows/ci.yml)
 ![Ruby](https://img.shields.io/badge/ruby-%3E%3D%203.1-CC342D)
 ![Rails](https://img.shields.io/badge/rails-%3E%3D%207.0.8-D30001)
