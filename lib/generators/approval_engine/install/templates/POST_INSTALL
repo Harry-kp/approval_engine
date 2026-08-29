@@ -37,8 +37,17 @@ Next steps:
          end
        end
 
-  5. Create an ACTIVE template + a matching rule (see the README quickstart),
-     then CONFIRM the wiring before relying on it:
+  5. Define the flow in db/seeds.rb — one block builds the template, its steps
+     and the rule that routes to it. Re-running it reconciles the same rows, so
+     it is safe on every deploy:
+
+       ApprovalEngine.define_flow "High-value invoice", tenant: account.id, model: Invoice do
+         on :create, when: { amount: { gt: 10_000 } }
+         step "Manager", group: "manager"
+         step "CFO",     group: "cfo"
+       end
+
+     Then CONFIRM the wiring before relying on it:
 
        invoice.preview_approval(event: "invoice.created").triggered?
        # false? -> check event_name match, the template's `active` status,

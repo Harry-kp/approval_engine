@@ -26,11 +26,20 @@ module ApprovalEngine
     # Flip this to `true` in development/test to surface the error loudly instead.
     attr_accessor :raise_on_rule_errors
 
+    # An optional allowlist of the group names `define_flow` may route to, e.g.
+    # `%w[manager cfo legal]`. nil — the default — means "no vocabulary
+    # declared", so nothing is checked and behaviour is unchanged. Set it and a
+    # `step group:` typo stops the seed instead of resolving zero actors at
+    # build time. All-or-nothing on purpose: a host whose
+    # `resolve_approval_group` invents names dynamically should leave it nil.
+    attr_accessor :approval_groups
+
     def initialize
       @outbox_queue          = :default
       @current_tenant_method = nil
       @actor_class           = "User"
       @raise_on_rule_errors  = false
+      @approval_groups       = nil
     end
 
     # The host's actor class, resolved lazily so reloading works in development.

@@ -16,16 +16,14 @@ ApprovalEngine.configure { |c| c.actor_class = "User" }
 manager = User.create!(name: "Maria (Manager)", role: "manager")
 cfo     = User.create!(name: "Carl (CFO)", role: "cfo")
 
-template = ApprovalEngine::TrackTemplate.create!(
-  tenant_id: TENANT, name: "High-value invoice", status: "active"
-)
-template.template_steps.create!(name: "Manager sign-off", layer: 1, assigned_group: "manager")
-template.template_steps.create!(name: "CFO sign-off",     layer: 2, assigned_group: "cfo")
-
-template.trigger_rules.create!(
-  tenant_id: TENANT, event_name: "invoice.created",
-  condition: { ">" => [ { "var" => "amount" }, 1000 ] }
-)
+# One block instead of a template, two steps and a hand-written JSON Logic rule.
+# It reconciles rather than inserts, so this is safe on every deploy — the reset
+# above is only here to make the demo output deterministic.
+ApprovalEngine.define_flow "High-value invoice", tenant: TENANT, model: Invoice do
+  on :create, when: { amount: { gt: 1000 } }
+  step "Manager sign-off", group: "manager"
+  step "CFO sign-off",     group: "cfo"
+end
 
 invoice  = Invoice.create!(tenant_id: TENANT, amount: 6000, department: "IT")
 approval = invoice.run_approval!(event: "invoice.created", tenant_id: TENANT)
