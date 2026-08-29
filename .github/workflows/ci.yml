@@ -24,12 +24,11 @@ jobs:
     name: test (ruby ${{ matrix.ruby }}, rails ${{ matrix.rails || 'latest' }})
     strategy:
       fail-fast: false
-      # The gemspec supports Rails >= 7.0.8, < 9.0. Pin one Rails per entry so
+      # The gemspec supports Rails >= 7.1, < 9.0. Pin one Rails per entry so
       # that range is exercised rather than asserted; a bare RAILS_VERSION
       # resolves to the newest release.
       matrix:
         include:
-          - { ruby: "3.2", rails: "7.0" }
           - { ruby: "3.2", rails: "7.1" }
           - { ruby: "3.3", rails: "7.2" }
           - { ruby: "3.4", rails: "8.0" }

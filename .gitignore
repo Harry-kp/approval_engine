@@ -22,3 +22,7 @@
 
 # Agent worktrees created by tooling — never part of the repo.
 /.claude/
+
+# The dummy app's schema is dumped with whichever Rails ran the migration, which
+# no older Rails in the CI matrix can read. Everything migrates from scratch.
+/test/dummy/db/schema.rb

@@ -50,6 +50,6 @@ Gem::Specification.new do |spec|
     ].select { |f| File.file?(f) }
   end
 
-  spec.add_dependency "rails", ">= 7.0.8", "< 9.0"
+  spec.add_dependency "rails", ">= 7.1", "< 9.0"
   spec.add_dependency "shiny_json_logic", "~> 0.3"
 end

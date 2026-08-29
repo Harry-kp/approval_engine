@@ -4,7 +4,7 @@
 [![Downloads](https://img.shields.io/gem/dt/approval_engine?logo=rubygems&color=blue)](https://rubygems.org/gems/approval_engine)
 [![CI](https://github.com/Harry-kp/approval_engine/actions/workflows/ci.yml/badge.svg)](https://github.com/Harry-kp/approval_engine/actions/workflows/ci.yml)
 ![Ruby](https://img.shields.io/badge/ruby-%3E%3D%203.1-CC342D)
-![Rails](https://img.shields.io/badge/rails-%3E%3D%207.0.8-D30001)
+![Rails](https://img.shields.io/badge/rails-%3E%3D%207.1-D30001)
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue)
 
 **A manager approves, then the CFO. Unless it's over $50k — then Legal too.**
@@ -35,7 +35,7 @@ approved, who approves, and what happens next.
 
 ## 60-second quickstart
 
-Needs PostgreSQL (the routing engine uses `jsonb`), Rails 7.0.8+, Ruby 3.1+.
+Needs PostgreSQL (the routing engine uses `jsonb`), Rails 7.1+, Ruby 3.1+.
 
 ```sh
 bundle add approval_engine

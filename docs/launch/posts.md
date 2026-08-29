@@ -258,7 +258,7 @@ with whatever you already run.
 - It does not touch your status column. It runs the process and reports the
 outcome; mapping that onto your own vocabulary stays your code.
 
-Honest state of it: 1.1.0, MIT, Rails 7.0.8+. 1.0 shipped in June and I never
+Honest state of it: 1.1.0, MIT, Rails 7.1+. 1.0 shipped in June and I never
 told anyone, so the user count is basically one. The API is stable and every
 documented recipe is covered by tests, but it has not met your edge cases yet
 and I would like it to.
@@ -404,7 +404,7 @@ never add a write surface or start mailing someone else's users.
 ## Where it actually is
 
 `approval_engine` is at 1.1.0. MIT, PostgreSQL only (the routing needs `jsonb`),
-Rails 7.0.8 through 8.x. It is young: 1.0 shipped in June, I never announced it,
+Rails 7.1 through 8.x. It is young: 1.0 shipped in June, I never announced it,
 and the user count is essentially one. The API is stable and every recipe in the
 cookbook is exercised by the test suite — but it has not met your edge cases yet.
 

@@ -102,6 +102,12 @@ behaviour, and every new surface is off until you switch it on.
   build if the README documents a config key, an `ApprovalEngine` method, a
   generator, or an image that does not exist.
 
+### Changed
+
+- **Minimum Rails is now 7.1**, up from 7.0.8. The outbox relay's retry backoff
+  uses `:polynomially_longer`, which 7.0 does not know, and 7.0 is past security
+  support. CI now runs the whole supported range rather than one version of it.
+
 ### Fixed
 
 - Approvals attached to a host record whose primary key is a UUID silently lost
