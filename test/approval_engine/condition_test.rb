@@ -110,6 +110,26 @@ module ApprovalEngine
       assert Condition.simple?({ ">" => [ { "var" => "amount" }, 10 ] })
     end
 
+    # JSON Logic overloads `in`. With an Array it is membership; with a String it
+    # is a substring test. Reading a substring rule into the simple form and
+    # saving it back would silently turn "contains" into "equals one of" — the
+    # exact rule-mangling this class exists to prevent.
+    test "a substring in is too complex for the simple form" do
+      substring = { "in" => [ { "var" => "name" }, "Spartacus" ] }
+
+      assert_nil Condition.parse(substring)
+      assert_not Condition.simple?(substring)
+      assert_nil Condition.parse({ "!" => [ substring ] })
+    end
+
+    test "substring and membership really do mean different things" do
+      substring  = { "in" => [ { "var" => "name" }, "Spartacus" ] }
+      membership = { "in" => [ { "var" => "name" }, [ "Spartacus" ] ] }
+
+      assert ::ShinyJsonLogic.apply(substring, { "name" => "Spart" })
+      assert_not ::ShinyJsonLogic.apply(membership, { "name" => "Spart" })
+    end
+
     # --- the `when:` sugar --------------------------------------------------------
 
     test "builds JSON Logic from the operator hash sugar" do

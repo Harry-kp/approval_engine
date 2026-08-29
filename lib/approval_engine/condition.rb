@@ -188,6 +188,12 @@ module ApprovalEngine
         return nil unless variable.is_a?(Hash) && variable.keys == [ "var" ]
         return nil if value.is_a?(Hash) # a comparison against another var is not simple
 
+        # JSON Logic overloads `in`: an Array operand is membership, a String
+        # operand is a substring test. The simple form only speaks membership,
+        # so a hand-written substring rule is reported as too complex rather
+        # than being read in and saved back out with different semantics.
+        return nil if symbol == :in && !value.is_a?(Array)
+
         new(field: variable["var"], operator: symbol, value: value)
       end
 
