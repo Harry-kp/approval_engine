@@ -1,0 +1,123 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    width: 2560px;
+    height: 1280px;
+    background: #0b0f17;
+    font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: #e8eef5;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* The two glows from the original card: a warm one bleeding in from the top
+     right, a cool one anchoring the bottom left. */
+  .glow-warm {
+    position: absolute; top: -420px; right: -260px;
+    width: 1500px; height: 1100px;
+    background: radial-gradient(ellipse at center, rgba(255,90,54,.22) 0%, rgba(255,90,54,.05) 42%, transparent 70%);
+  }
+  .glow-cool {
+    position: absolute; bottom: -520px; left: -320px;
+    width: 1500px; height: 1100px;
+    background: radial-gradient(ellipse at center, rgba(56,110,255,.20) 0%, rgba(56,110,255,.04) 45%, transparent 72%);
+  }
+
+  .frame { position: relative; padding: 120px 152px 118px; height: 100%; display: flex; flex-direction: column; }
+
+  .eyebrow {
+    display: flex; align-items: center; gap: 22px;
+    font-size: 34px; font-weight: 600; letter-spacing: .22em;
+    color: #ff5a36; text-transform: uppercase;
+  }
+  .dot {
+    width: 20px; height: 20px; border-radius: 50%; background: #ff5a36;
+    box-shadow: 0 0 26px 8px rgba(255,90,54,.45);
+  }
+
+  .chain { position: absolute; top: 128px; right: 152px; display: flex; align-items: center; gap: 20px; }
+  .node {
+    padding: 20px 38px; border-radius: 16px;
+    background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.09);
+    font-size: 34px; font-weight: 500; color: #c7d2e0;
+  }
+  .arrow { color: #ff5a36; font-size: 36px; }
+
+  h1 {
+    margin-top: 86px;
+    font-size: 176px; font-weight: 800; letter-spacing: -.035em; line-height: 1;
+  }
+  h1 .accent { color: #ff5a36; }
+
+  /* The pitch is the pain, in the customer's words — not the architecture.
+     The old card led with "Multi-tenant, immutable-ledger", which describes
+     the machinery to someone who already knows they want it. */
+  .pitch {
+    margin-top: 54px;
+    font-size: 62px; font-weight: 500; line-height: 1.28; color: #dbe4ef;
+    max-width: 1900px;
+  }
+  .pitch .dim { color: #7c8b9e; }
+
+  .chips { margin-top: 76px; display: flex; flex-wrap: nowrap; gap: 20px; }
+  .chip {
+    padding: 20px 32px; border-radius: 999px; white-space: nowrap;
+    background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.10);
+    font-size: 31px; font-weight: 500; color: #c3cede;
+  }
+
+  .footer { margin-top: auto; display: flex; align-items: center; justify-content: space-between; }
+  .install {
+    display: flex; align-items: center; gap: 24px;
+    padding: 34px 52px; border-radius: 20px;
+    background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.10);
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 44px;
+  }
+  .install .prompt { color: #55637a; }
+  .install .cmd { color: #56d67f; font-weight: 600; }
+  .repo { font-size: 42px; color: #93a1b5; font-weight: 500; }
+</style>
+</head>
+<body>
+  <div class="glow-warm"></div>
+  <div class="glow-cool"></div>
+
+  <div class="frame">
+    <div class="eyebrow"><span class="dot"></span> Ruby gem · Rails engine</div>
+
+    <div class="chain">
+      <div class="node">Approval</div><span class="arrow">→</span>
+      <div class="node">Track</div><span class="arrow">→</span>
+      <div class="node">Step</div>
+    </div>
+
+    <h1>Approval<span class="accent">Engine</span></h1>
+
+    <div class="pitch">
+      A manager approves, then the CFO.<br>
+      <span class="dim">Unless it's over $50k — then Legal too.</span>
+    </div>
+
+    <div class="chips">
+      <div class="chip">Rules admins change without a deploy</div>
+      <div class="chip">Append-only audit trail</div>
+      <div class="chip">Sequential, parallel, or “any 2 of 5”</div>
+      <div class="chip">No Redis or Sidekiq</div>
+    </div>
+
+    <div class="footer">
+      <div class="install"><span class="prompt">$</span><span class="cmd">gem install approval_engine</span></div>
+      <div class="repo">github.com/Harry-kp/approval_engine</div>
+    </div>
+  </div>
+</body>
+</html>
