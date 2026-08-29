@@ -253,7 +253,8 @@ ApprovalEngine.configure do |config|
   # Both 1.1 surfaces are off until asked for — see ADR 9 and ADR 10.
   config.notifications_enabled = true
   config.mailer_from           = "approvals@acme.com"
-  config.approval_url_builder  = ->(approval) { invoice_url(approval.target) }
+  # Url helpers are not in scope in an initializer — go through the routes proxy.
+  config.approval_url_builder  = ->(approval) { Rails.application.routes.url_helpers.invoice_url(approval.target) }
   config.reminder_after        = 2.days.to_i
 
   config.admin_enabled = true   # routes are drawn at boot; restart to apply

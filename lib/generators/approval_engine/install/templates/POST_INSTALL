@@ -67,7 +67,9 @@ Next steps:
 
        config.notifications_enabled = true
        config.mailer_from           = "approvals@example.com"  # or parent_mailer
-       config.approval_url_builder  = ->(a) { invoice_url(a.target) }
+       config.approval_url_builder  = ->(a) {
+         Rails.application.routes.url_helpers.invoice_url(a.target)
+       }
 
      Without a From address nothing can be delivered; without a URL builder the
      mail arrives with nowhere to go. Set config.approval_recipients too, or the

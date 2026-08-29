@@ -21,7 +21,7 @@ ledger of who decided what, routing rules your admins change without a deploy,
 and side-effects that can't roll back an approval. You decide what gets
 approved, who approves, and what happens next.
 
-![The mounted dashboard: six approvals across pending, approved and rejected, with a time-in-step column](https://raw.githubusercontent.com/Harry-kp/approval_engine/main/assets/screenshot-dashboard.png)
+![The mounted dashboard: six approvals across pending, approved and rejected, filterable by status](https://raw.githubusercontent.com/Harry-kp/approval_engine/main/assets/screenshot-dashboard.png)
 
 ![One approval in detail: layer 1 approved, Legal and IT both pending at layer 2 under all-must-approve consensus, the CFO waiting at layer 3, and the audit trail below](https://raw.githubusercontent.com/Harry-kp/approval_engine/main/assets/screenshot-approval.png)
 
@@ -351,9 +351,12 @@ and a record name themselves in an inbox, and fall back to something readable
 rather than an object inspection.
 
 The mails go out through the same transactional outbox as every other
-side-effect, so a flaky SMTP host retries with backoff and never touches the
-approval. Delivery is at-least-once, which for email means an approver may
-occasionally get the same nudge twice — the tradeoff for never getting zero.
+side-effect, so a dead SMTP host can never touch the approval: the transition
+has already committed, and only the delivery fails. Delivery is at-least-once,
+which for email means an approver may occasionally get the same nudge twice —
+the tradeoff for never getting zero. The engine hands the message to
+`deliver_later` and imposes no retry policy of its own, so what happens to a
+bounced job is whatever your Active Job backend already does with a failure.
 
 Reminders are a separate, opt-in sweep. Set how long a step may sit unanswered
 and schedule the job with whatever recurring mechanism you already run:
@@ -369,6 +372,15 @@ ApprovalEngine::ReminderSweepJob.perform_later(tenant_id: account.id)
 
 Each step is nudged at most once, so running the sweep hourly only makes the
 nudge arrive sooner. It never mails the same person about the same step twice.
+
+Be deliberate about the first run. `reminder_after` is measured from when a step
+became actionable, not from when you switched reminders on, so the first sweep
+nudges *every* step already past the threshold — on an app with a backlog that
+is one large batch of email. Check what it will pick up before you schedule it:
+
+```ruby
+ApprovalEngine::Step.remindable(after: 2.days.to_i).count
+```
 The stamp that makes that true lives in a column added in 1.1, so an app
 upgrading from 1.0 needs `bin/rails approval_engine:install:migrations` and
 `bin/rails db:migrate` before scheduling the sweep — nothing else in the engine
@@ -472,8 +484,10 @@ A single-track run is an approval with one track, not a special path.
 You never build that chain by hand: start a run with
 `run_approval!` and act on a step with `step.approve!`. The
 layers surface only when you need them, such as parallel tracks or the
-dashboard. For a single-track approval, `approval.track` and
-`approval.step` read it back without `.first`.
+dashboard. For a single-track approval, `approval.track` reads it back without
+`.first`, and `approval.step` does the same for an approval that has exactly one
+step — it is `sole`, so it raises rather than guess when there are two, which is
+the case for the manager-then-CFO flow above.
 
 `approvals_required` is one idea used at two levels: within a layer (how many of
 its steps), and across the parallel tracks of a scatter-gather (how many tracks

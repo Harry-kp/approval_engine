@@ -104,10 +104,18 @@ behaviour, and every new surface is off until you switch it on.
 
 ### Upgrading from 1.0
 
-Nothing to do. No config change, no behaviour change, nothing to migrate before
-the gem will run. Both new surfaces default to off, and leaving them off makes
-1.1.0 behave exactly as 1.0.0 did. **Nothing turns itself on because you bumped
-a version.**
+Nothing to do, and nothing to migrate before the gem will run. Both new
+surfaces default to off: no mail is sent and no write endpoint exists until you
+ask for them. **Nothing that touches your users or calls your code turns itself
+on because you bumped a version.**
+
+One thing does change without asking, and it is worth knowing about. The ledger
+now emits a `step.activated` outbox event when a step becomes actionable —
+roughly one extra outbox row and relay job per step. It reaches your app only if
+you subscribe to it: `ActiveSupport::Notifications` subscribers matching
+`approval_engine.*` will start seeing `approval_engine.step.activated`, and a
+model that happens to define `after_step_activated(step)` will start having it
+called. If neither is true of your app, the only difference is the extra rows.
 
 There is one new migration, and only the reminder sweep reads the column it
 adds, so it is needed when you want reminders and not before:

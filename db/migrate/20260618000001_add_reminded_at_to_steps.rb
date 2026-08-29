@@ -8,10 +8,16 @@ class AddRemindedAtToSteps < ActiveRecord::Migration[7.0]
     add_column :approval_engine_steps, :reminded_at, :datetime
 
     # The reminder sweep's twin of idx_ae_steps_overdue: only un-nudged, still
-    # pending steps are ever scanned. On a very large table build this by hand
-    # with CREATE INDEX CONCURRENTLY first — the partial predicate is identical.
+    # pending steps are ever scanned. This builds with a lock, which on a very
+    # large steps table means writes wait. To avoid that, create it by hand
+    # first and then run the migration — `if_not_exists` makes it a no-op:
+    #
+    #   CREATE INDEX CONCURRENTLY idx_ae_steps_remindable
+    #     ON approval_engine_steps (activated_at)
+    #     WHERE reminded_at IS NULL AND status = 'pending';
     add_index :approval_engine_steps, :activated_at,
               where: "reminded_at IS NULL AND status = 'pending'",
-              name: "idx_ae_steps_remindable"
+              name: "idx_ae_steps_remindable",
+              if_not_exists: true
   end
 end
