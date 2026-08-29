@@ -51,6 +51,10 @@ then a CFO:
 ApprovalEngine.configure do |config|
   config.actor_class           = "User"                 # who approves
   config.current_tenant_method = -> { Current.account } # anything with #id
+
+  # `Current` here is your own ActiveSupport::CurrentAttributes class — the
+  # engine only ever calls `#id` on what you return. Not multi-tenant? Return a
+  # constant instead: `-> { Struct.new(:id).new("default") }`.
 end
 
 # app/models/user.rb — who is in a group, resolved at runtime against your own models
