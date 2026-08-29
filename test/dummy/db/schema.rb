@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_17_000002) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_18_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -94,12 +94,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_17_000002) do
     t.integer "iteration", default: 1, null: false
     t.integer "layer", default: 1, null: false
     t.string "name"
+    t.datetime "reminded_at"
     t.string "status", default: "pending", null: false
     t.string "tenant_id", null: false
     t.datetime "timed_out_at"
     t.integer "timeout_after"
     t.datetime "timeout_at"
     t.datetime "updated_at", null: false
+    t.index ["activated_at"], name: "idx_ae_steps_remindable", where: "((reminded_at IS NULL) AND ((status)::text = 'pending'::text))"
     t.index ["approval_engine_track_id", "iteration", "layer", "status"], name: "idx_ae_steps_layer_consensus"
     t.index ["approval_engine_track_id"], name: "index_approval_engine_steps_on_approval_engine_track_id"
     t.index ["assigned_actor_type", "assigned_actor_id"], name: "index_approval_engine_steps_on_assigned_actor"
@@ -171,6 +173,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_17_000002) do
 
   create_table "users", force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.string "email"
     t.string "name"
     t.string "role"
     t.datetime "updated_at", null: false

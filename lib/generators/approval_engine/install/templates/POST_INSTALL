@@ -61,4 +61,29 @@ Next steps:
 
        mount ApprovalEngine::Engine => "/approval_engine"
 
+  8. (Optional) Turn on the built-in notifications. They are OFF by default so
+     that installing or upgrading the gem never mails your users on its own.
+     Enabling them needs THREE things, not one:
+
+       config.notifications_enabled = true
+       config.mailer_from           = "approvals@example.com"  # or parent_mailer
+       config.approval_url_builder  = ->(a) { invoice_url(a.target) }
+
+     Without a From address nothing can be delivered; without a URL builder the
+     mail arrives with nowhere to go. Set config.approval_recipients too, or the
+     approved / rejected / changes-requested emails stay silent — the engine
+     knows who approves, but only you know who asked.
+
+  9. (Optional) Schedule the reminder sweep so a quiet approver gets nudged.
+     Set the threshold, then run the job on whatever recurring mechanism you
+     already have (solid_queue recurring tasks, sidekiq-cron, whenever, cron):
+
+       config.reminder_after = 2.days.to_i
+
+       ApprovalEngine::ReminderSweepJob.perform_later              # all tenants
+       ApprovalEngine::ReminderSweepJob.perform_later(tenant_id: account.id)
+
+     Each step is nudged at most once, so running it often is safe. While
+     reminder_after is nil the sweep is a no-op.
+
 ===============================================================================

@@ -13,7 +13,10 @@ module ApprovalEngine
     end
 
     test "approval writes an audit row and an outbox event" do
-      assert_difference -> { AuditLog.count } => 1, -> { OutboxEvent.count } => 1 do
+      # Counted by name, not in total: approving layer 1 also activates layer 2,
+      # and that activation is an outbox event of its own (step.activated).
+      assert_difference -> { AuditLog.count } => 1,
+                        -> { OutboxEvent.where(event_name: "step.approved").count } => 1 do
         @step.approve!(by: @manager, comment: "Looks good")
       end
 
@@ -92,6 +95,39 @@ module ApprovalEngine
       @step.update!(status: "cancelled")
 
       assert_nil @step.reload.decided_at, "a cancellation is not a decision"
+    end
+
+    # step.activated is the event that finally lets something downstream tell an
+    # approver they have work. It has to fire exactly once per step: a missed one
+    # is silence, a duplicate one is a second email for the same task.
+    test "a step becoming actionable emits exactly one activation event" do
+      activations = -> { OutboxEvent.where(event_name: "step.activated").count }
+
+      assert_equal 1, activations.call, "one for the pending step, none for the waiting one"
+
+      assert_difference activations, 1 do
+        @step.approve!(by: @manager) # opens layer 2
+      end
+    end
+
+    test "reassigning does not re-announce the step as newly activated" do
+      backup = create_user(role: :backup)
+
+      assert_no_difference -> { OutboxEvent.where(event_name: "step.activated").count } do
+        @step.reassign!(to: backup)
+      end
+    end
+
+    test "a decision never emits an activation event for the step that was decided" do
+      assert_no_difference -> { OutboxEvent.where(event_name: "step.activated", record: @step).count } do
+        @step.approve!(by: @manager)
+      end
+    end
+
+    test "a fresh iteration announces its first layer" do
+      assert_difference -> { OutboxEvent.where(event_name: "step.activated").count }, 1 do
+        @step.request_changes!(by: @manager)
+      end
     end
 
     test "a waiting step has no activation time until its layer opens" do

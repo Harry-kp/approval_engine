@@ -1,0 +1,5 @@
+<p style="margin:0 0 8px;"><strong><%= @target_label %></strong> was not approved.</p>
+<% if @reason.present? %>
+  <p style="margin:0 0 16px; color:#334155;">Reason: <%= @reason %></p>
+<% end %>
+<%= render partial: "call_to_action", formats: [ :html ] %>

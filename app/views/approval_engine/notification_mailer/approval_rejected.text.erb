@@ -1,0 +1,5 @@
+<%= @target_label %> was not approved.
+<% if @reason.present? %>
+Reason: <%= @reason %>
+<% end %>
+<%= render partial: "call_to_action", formats: [ :text ] %>

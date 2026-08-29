@@ -36,6 +36,15 @@ module ApprovalEngine
 
     before_update :guard_immutable_transition
     before_save :stamp_timing
+    # A step becoming actionable is the one ledger event the outbox never
+    # carried, so nothing downstream could tell an approver they had work
+    # waiting. Fires on build (created straight into `pending`) and on
+    # waiting->pending activation — the same two moments `stamp_timing` covers.
+    # Split across the two callbacks rather than one `after_save`, because
+    # `status` defaults to "pending" in the database: a step built as pending
+    # records no *change* to compare against, so create has to be its own case.
+    after_create :emit_activation, if: :pending?
+    after_update :emit_activation, if: -> { saved_change_to_status? && pending? }
 
     scope :waiting, -> { where(status: "waiting") }
     scope :pending, -> { where(status: "pending") }
@@ -47,6 +56,13 @@ module ApprovalEngine
     # set the timeout sweep acts on. Each step times out at most once.
     scope :overdue, ->(as_of = Time.current) {
       pending.where(timed_out_at: nil).where.not(timeout_at: nil).where("timeout_at <= ?", as_of)
+    }
+    # Pending steps that have sat unanswered longer than `after` seconds and
+    # haven't been nudged yet — the set the reminder sweep acts on. Each step is
+    # nudged at most once, so a sweep that runs every minute is as safe as one
+    # that runs nightly.
+    scope :remindable, ->(after:, as_of: Time.current) {
+      pending.where(reminded_at: nil).where.not(activated_at: nil).where("activated_at <= ?", as_of - after)
     }
 
     # An approver's inbox: pending steps the actor may act on — assigned to them
@@ -137,6 +153,22 @@ module ApprovalEngine
       self
     end
 
+    # A nudge, not a verdict. Nothing about the step's authority changes — the
+    # only write is the stamp that stops it being nudged again. Like time_out!,
+    # it fires at most once and is idempotent under concurrent sweeps.
+    def remind!
+      track.approval.with_lock do
+        reload
+        return self unless pending? && reminded_at.nil?
+
+        update!(reminded_at: Time.current)
+        record_audit(event: "reminded", by: nil, comment: nil)
+        emit_outbox("step.reminded")
+      end
+
+      self
+    end
+
     # Honest denial when an approver never acted in time: the step becomes
     # `expired` (a distinct terminal state — never "approved", never a human
     # "rejected"), with no human actor on the ledger. Resolves the surrounding
@@ -192,6 +224,25 @@ module ApprovalEngine
       swept
     end
 
+    # Nudge every step that has gone quiet for longer than
+    # `config.reminder_after`. A no-op while that is nil, so scheduling the sweep
+    # before configuring the threshold is harmless. Returns the number nudged.
+    # One step raising is logged and skipped so it can't starve the batch,
+    # exactly like the timeout sweep. ReminderSweepJob wraps this.
+    def self.sweep_reminders!(tenant_id: nil, after: ApprovalEngine.config.reminder_after)
+      return 0 if after.blank?
+
+      scope = tenant_id ? remindable(after: after).for_tenant(tenant_id) : remindable(after: after)
+      reminded = 0
+      scope.find_each do |step|
+        step.remind!
+        reminded += 1
+      rescue StandardError => e
+        Rails.logger&.warn("[ApprovalEngine] reminder sweep skipped step #{step.id}: #{e.class}: #{e.message}")
+      end
+      reminded
+    end
+
     private
 
     # The shared transition pipeline. We lock the *approval* — the aggregate
@@ -232,6 +283,10 @@ module ApprovalEngine
 
     def emit_outbox(event_name)
       OutboxEvent.create!(tenant_id: tenant_id, event_name: event_name, record: self)
+    end
+
+    def emit_activation
+      emit_outbox("step.activated")
     end
 
     def guard_immutable_transition

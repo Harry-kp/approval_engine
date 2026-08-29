@@ -1,0 +1,19 @@
+# Subjects for the built-in notifications. The engine's locale path is loaded
+# before the application's, so a host reworded subject in their own en.yml wins
+# without forking the mailer. `%{target}` is the label from
+# `config.target_label_method`, already resolved to a plain String.
+en:
+  approval_engine:
+    notification_mailer:
+      step_activated:
+        subject: "Approval needed: %{target}"
+      step_reminder:
+        subject: "Still waiting on you: %{target}"
+      step_reassigned:
+        subject: "Approval handed to you: %{target}"
+      changes_requested:
+        subject: "Changes requested: %{target}"
+      approval_approved:
+        subject: "Approved: %{target}"
+      approval_rejected:
+        subject: "Rejected: %{target}"

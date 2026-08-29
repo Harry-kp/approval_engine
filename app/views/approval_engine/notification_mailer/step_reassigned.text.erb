@@ -1,0 +1,5 @@
+Hello<%= " #{@actor_label}" if @actor_label.present? %>,
+
+<%= @target_label %> has been handed to you for approval. It is waiting on you now.
+<%= render partial: "details", formats: [ :text ] %>
+<%= render partial: "call_to_action", formats: [ :text ] %>

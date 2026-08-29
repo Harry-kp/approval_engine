@@ -1,0 +1,6 @@
+HOST OVERRIDE SENTINEL — this file lives in the dummy *application*, not the
+engine, and exists to prove that a host app's copy of a notification template
+wins over the one the engine ships. If NotificationMailerTest stops seeing this
+sentinel, the "just drop a file in your app" customisation story is broken.
+
+<%= @target_label %> has been handed to you for approval.

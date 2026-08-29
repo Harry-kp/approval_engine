@@ -15,6 +15,10 @@ module ApprovalEngine
         assert_match(/ApprovalEngine\.configure do \|config\|/, content)
         assert_match(/config\.actor_class = "User"/, content)
         assert_match(/config\.raise_on_rule_errors = false/, content)
+        # The opt-in is written out rather than implied: an adopter reading the
+        # generated file must see that notifications are off, not infer it.
+        assert_match(/config\.notifications_enabled = false/, content)
+        assert_match(/config\.reminder_after = nil/, content)
       end
     end
   end
