@@ -21,7 +21,7 @@ module ApprovalEngine
         if @template_step.save
           redirect_to admin_track_template_path(@track_template), notice: "Step added."
         else
-          render :new, status: :unprocessable_entity
+          render :new, status: 422
         end
       end
 
@@ -32,7 +32,7 @@ module ApprovalEngine
         if @template_step.update(template_step_params)
           redirect_to admin_track_template_path(@track_template), notice: "Step updated."
         else
-          render :edit, status: :unprocessable_entity
+          render :edit, status: 422
         end
       end
 

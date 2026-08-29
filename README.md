@@ -3,7 +3,7 @@
 [![Gem Version](https://img.shields.io/gem/v/approval_engine?logo=rubygems&color=E9573F)](https://rubygems.org/gems/approval_engine)
 [![Downloads](https://img.shields.io/gem/dt/approval_engine?logo=rubygems&color=blue)](https://rubygems.org/gems/approval_engine)
 [![CI](https://github.com/Harry-kp/approval_engine/actions/workflows/ci.yml/badge.svg)](https://github.com/Harry-kp/approval_engine/actions/workflows/ci.yml)
-![Ruby](https://img.shields.io/badge/ruby-%3E%3D%203.1-CC342D)
+![Ruby](https://img.shields.io/badge/ruby-%3E%3D%203.2-CC342D)
 ![Rails](https://img.shields.io/badge/rails-%3E%3D%207.1-D30001)
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue)
 
@@ -35,7 +35,8 @@ approved, who approves, and what happens next.
 
 ## 60-second quickstart
 
-Needs PostgreSQL (the routing engine uses `jsonb`), Rails 7.1+, Ruby 3.1+.
+Needs PostgreSQL 13+ (the routing engine uses `jsonb` and `gin`; the tables key
+on `gen_random_uuid()`), Rails 7.1+, Ruby 3.2+.
 
 ```sh
 bundle add approval_engine
@@ -505,6 +506,22 @@ A rule too complex for the simple form — an `or`, a nested group, a substring
 into something it isn't. That fallback is the point: the form is a convenience
 over the storage format, never a lossy replacement for it.
 
+## Housekeeping
+
+The audit trail is the point of the ledger and is never swept. The **outbox is
+not** — it is a queue, one row per activation, decision and outcome, and a
+relayed row has no reader. Sweep it on whatever schedule you already run:
+
+```ruby
+ApprovalEngine::OutboxEvent.purge!                     # relayed, older than 30 days
+ApprovalEngine::OutboxEvent.purge!(older_than: 7.days)
+```
+
+Dead letters are kept whatever their age — an event that exhausted its retries
+is evidence of a callback that needs fixing, not litter. Find them with
+`ApprovalEngine::OutboxEvent.failed`, and clear `failed_at` to let the relay
+pick one up again.
+
 ## Core concepts
 
 | Term | What it is |
@@ -586,7 +603,7 @@ edge cases yet.
 
 ## Development
 
-ApprovalEngine needs Ruby 3.1+ and PostgreSQL.
+ApprovalEngine needs Ruby 3.2+ and PostgreSQL 13+.
 
 ```sh
 bin/setup

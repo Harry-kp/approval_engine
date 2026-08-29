@@ -36,7 +36,7 @@ module ApprovalEngine
         if @track_template.save
           redirect_to admin_track_template_path(@track_template), notice: "Template created."
         else
-          render :new, status: :unprocessable_entity
+          render :new, status: 422
         end
       end
 
@@ -47,7 +47,7 @@ module ApprovalEngine
         if @track_template.update(track_template_params)
           redirect_to admin_track_template_path(@track_template), notice: "Template updated."
         else
-          render :edit, status: :unprocessable_entity
+          render :edit, status: 422
         end
       end
 

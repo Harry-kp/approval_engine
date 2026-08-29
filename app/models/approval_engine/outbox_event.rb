@@ -13,6 +13,7 @@ module ApprovalEngine
     validates :tenant_id, :event_name, presence: true
 
     scope :unprocessed, -> { where(processed: false) }
+    scope :processed, -> { where(processed: true) }
     # Dead letters: delivery retries were exhausted. Excluded from drain! so a
     # permanently-failing callback isn't resurrected forever; surfaced here for
     # ops to inspect and replay (clear failed_at to let drain! pick it up again).
@@ -32,6 +33,23 @@ module ApprovalEngine
                  .order(:created_at).limit(limit).pluck(:id).each do |id|
         ProcessOutboxJob.perform_later(id)
       end
+    end
+
+    # The outbox is a queue, not a ledger: once an event is relayed its row has
+    # no reader, and one is written per step activation, decision and outcome.
+    # Left alone the table grows without bound, so a host is expected to sweep
+    # it — the audit trail lives in AuditLog and is never touched by this.
+    #
+    #   ApprovalEngine::OutboxEvent.purge!                      # processed, 30d+
+    #   ApprovalEngine::OutboxEvent.purge!(older_than: 7.days)
+    #
+    # Returns the number of rows deleted. Dead letters are kept regardless of
+    # age: an event that exhausted its retries is evidence, not litter.
+    def self.purge!(older_than: 30.days, limit: 10_000)
+      ids = processed.where(failed_at: nil)
+                     .where(processed_at: ..older_than.ago)
+                     .order(:processed_at).limit(limit).pluck(:id)
+      where(id: ids).delete_all
     end
 
     def mark_processed!

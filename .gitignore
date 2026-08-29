@@ -5,6 +5,9 @@
 /tmp/
 /test/tmp/
 /test/dummy/log/*.log
+# Rotated logs too: `test.log.0` doesn't match `*.log`, and a 100MB one is how
+# it gets noticed — at the push.
+/test/dummy/log/*.log.*
 /test/dummy/storage/
 /test/dummy/tmp/
 
