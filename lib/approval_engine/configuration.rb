@@ -26,74 +26,57 @@ module ApprovalEngine
     # Flip this to `true` in development/test to surface the error loudly instead.
     attr_accessor :raise_on_rule_errors
 
-    # An optional allowlist of the group names `define_flow` may route to, e.g.
-    # `%w[manager cfo legal]`. nil — the default — means "no vocabulary
-    # declared", so nothing is checked and behaviour is unchanged. Set it and a
-    # `step group:` typo stops the seed instead of resolving zero actors at
-    # build time. All-or-nothing on purpose: a host whose
-    # `resolve_approval_group` invents names dynamically should leave it nil.
+    # Optional allowlist of group names `define_flow` may route to, e.g.
+    # `%w[manager cfo legal]`. nil (the default) checks nothing. Set it and a
+    # `step group:` typo stops the seed instead of resolving zero actors later.
     attr_accessor :approval_groups
 
-    # Master switch for the built-in notifications. OFF by default and
-    # deliberately so: upgrading the gem must never start mailing an adopter's
-    # real users. Nothing below it has any effect until this is true.
+    # Master switch. Off by default: upgrading the gem must never start mailing
+    # real users. Nothing below has any effect until this is true.
     attr_accessor :notifications_enabled
 
-    # Which notifications are live, as symbols. Drop one to silence it without
-    # writing a mailer:  config.notification_events -= [ :step_reassigned ]
+    # Drop one to silence it: config.notification_events -= [ :step_reassigned ]
     attr_accessor :notification_events
 
-    # The mailer the notifier sends through. Point it at a subclass of
-    # ApprovalEngine::NotificationMailer to override individual actions wholesale.
+    # Point at a NotificationMailer subclass to override actions wholesale.
     attr_accessor :mailer_class
 
-    # What NotificationMailer inherits from. Point it at your ApplicationMailer to
-    # pick up your layout, your `default from:`, and your styling. Read *once*,
-    # when the mailer class is first loaded, so it belongs in an initializer.
+    # What NotificationMailer inherits from — point at your ApplicationMailer for
+    # its layout and sender. Read once at class load, so set it in an initializer.
     attr_accessor :parent_mailer
 
-    # The From address. Leave nil when `parent_mailer` already supplies one;
-    # otherwise set it, or Action Mailer has no sender to hand the SMTP server.
+    # From address. Leave nil only when `parent_mailer` already supplies one.
     attr_accessor :mailer_from
 
-    # ActiveJob queue for the mail itself. nil means your app's own mailer queue —
-    # the engine doesn't force a queue name on you.
+    # ActiveJob queue for the mail. nil uses your app's own mailer queue.
     attr_accessor :mailer_queue
 
-    # How the engine reads an address off an actor. Whatever this returns blank
-    # for is skipped, never raised on: an actor without an email is a
-    # configuration problem, not a reason to fail an approval.
+    # How to read an address off an actor. A blank result is skipped, never
+    # raised on — a missing email is not a reason to fail an approval.
     attr_accessor :actor_email_method
 
-    # How an actor, and the record under approval, name themselves in an email.
-    # nil falls back to something safe and generic, so a host that configures
-    # nothing still gets readable mail instead of "#<Invoice:0x00007f...>".
+    # How an actor and the record name themselves in mail. nil falls back to
+    # something readable rather than "#<Invoice:0x00007f...>".
     attr_accessor :actor_label_method
     attr_accessor :target_label_method
 
-    # A callable returning the URL where this approval is acted on, e.g.
-    # `->(approval) { Rails.application.routes.url_helpers.invoice_url(approval.target) }`.
-    # The engine can't know your routes, so while this is nil the mail carries no
-    # link — which is exactly why you want to set it.
+    # Callable returning where this approval is acted on. While nil the mail
+    # carries no link, which is why you want to set it:
+    # `->(a) { Rails.application.routes.url_helpers.invoice_url(a.target) }`
     attr_accessor :approval_url_builder
 
-    # A callable returning the actors an *approval-level* notification goes to
-    # (approved / rejected / changes requested), e.g.
-    # `->(approval) { [ approval.target.submitter ] }`. The engine knows who
-    # approves; only you know who asked. While this is nil, those three are never
-    # sent.
+    # Who the approval-level mails (approved / rejected / changes requested) go
+    # to, e.g. `->(a) { [ a.target.submitter ] }`. The engine knows who approves;
+    # only you know who asked. While nil, those three are never sent.
     attr_accessor :approval_recipients
 
-    # Seconds a step may sit unanswered before the reminder sweep nudges its
-    # assignee. nil = reminders off, which is why scheduling ReminderSweepJob
-    # before configuring this does nothing.
+    # Seconds a step may sit unanswered before the sweep nudges its assignee.
+    # nil = reminders off, so scheduling ReminderSweepJob alone does nothing.
     attr_accessor :reminder_after
 
-    # Mounts the built-in template/rule admin — the write half of the dashboard.
-    # Default false on purpose: 1.0 shipped a read-only dashboard that hosts
-    # mounted behind whatever auth they had, and a gem upgrade must never turn
-    # that into a write surface on its own. Turning it on is not authentication:
-    # wrap the mount in your own authenticated constraint either way.
+    # Mounts the template/rule admin — the write half of the dashboard. Default
+    # false: 1.0 shipped a read-only dashboard, and an upgrade must not turn it
+    # into a write surface. Turning it on is not authentication — wrap the mount.
     attr_accessor :admin_enabled
 
     def initialize
@@ -129,9 +112,8 @@ module ApprovalEngine
       current_tenant_method&.call
     end
 
-    # True when this notification should actually be sent. Both gates matter: the
-    # master switch keeps an upgrade silent, and the event list lets a host keep
-    # the layer on while muting one message.
+    # Both gates matter: the switch keeps an upgrade silent, the list mutes one
+    # message without turning the layer off.
     def notification_enabled?(name)
       notifications_enabled && notification_events.include?(name)
     end
@@ -141,14 +123,12 @@ module ApprovalEngine
       mailer_class.to_s.constantize
     end
 
-    # The address to mail an actor at, or nil when there isn't one. `try` means an
-    # actor that doesn't respond to the method at all is skipped, not raised on.
+    # `try`, so an actor that doesn't respond is skipped rather than raised on.
     def actor_email(actor)
       actor.try(actor_email_method).presence
     end
 
-    # How an actor is addressed in an email. Unlike the dashboard's deliberately
-    # technical `User#3 (Manager)`, this is read by a human in their inbox.
+    # Read by a human in an inbox, unlike the dashboard's `User#3 (Manager)`.
     def actor_label(actor)
       return "" if actor.nil?
 
@@ -157,8 +137,8 @@ module ApprovalEngine
         "#{actor.class.name} ##{actor.id}"
     end
 
-    # ActiveRecord doesn't define a human `to_s`, so the fallback is a class-and-id
-    # shape rather than an object inspection leaking into someone's inbox.
+    # ActiveRecord has no human `to_s`, so fall back to class-and-id rather than
+    # leaking an object inspection into someone's inbox.
     def target_label(target)
       return "" if target.nil?
 

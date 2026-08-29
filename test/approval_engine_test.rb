@@ -22,7 +22,7 @@ module ApprovalEngine
   class AdminConfigurationTest < ApprovalEngine::TestCase
     # The single most important default in this release: 1.0 hosts mounted a
     # read-only dashboard, and `bundle update` must never hand them a write
-    # surface. If this ever flips, that is a privilege-escalation regression.
+    # surface.
     test "the admin is off by default" do
       assert_equal false, ApprovalEngine::Configuration.new.admin_enabled
     end

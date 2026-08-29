@@ -39,11 +39,9 @@ module ApprovalEngine
       assert_raises(ArgumentError) { Condition.to_json_logic([]) }
     end
 
-    # --- casting ----------------------------------------------------------------
-    #
-    # Form input arrives as strings. If "10000" were stored verbatim, JSON Logic
-    # would compare a number against a string and never match — the single most
-    # likely way for a hand-built rule to silently do nothing.
+    # --- casting
+    # ---------------------------------------------------------------- Form
+    # input arrives as strings.
 
     test "casts form strings using the declared exposure type" do
       assert_equal 10_000, Condition.new(field: "amount", operator: :gt, value: "10000", type: :integer).value
@@ -110,10 +108,7 @@ module ApprovalEngine
       assert Condition.simple?({ ">" => [ { "var" => "amount" }, 10 ] })
     end
 
-    # JSON Logic overloads `in`. With an Array it is membership; with a String it
-    # is a substring test. Reading a substring rule into the simple form and
-    # saving it back would silently turn "contains" into "equals one of" — the
-    # exact rule-mangling this class exists to prevent.
+    # JSON Logic overloads `in`.
     test "a substring in is too complex for the simple form" do
       substring = { "in" => [ { "var" => "name" }, "Spartacus" ] }
 
@@ -169,10 +164,8 @@ module ApprovalEngine
       assert_raises(ArgumentError) { Condition.from({ amount: { gt: 1, lt: 2 } }) }
     end
 
-    # --- the contract that actually matters ---------------------------------------
-    #
-    # Everything above is shape. This proves the shapes we emit are the shapes the
-    # evaluator agrees with, against the real JSON Logic implementation.
+    # --- the contract that actually matters
+    # --------------------------------------- Everything above is shape.
 
     test "every rendered operator evaluates correctly through the real evaluator" do
       payload = { "amount" => 10_000, "region" => "EU" }

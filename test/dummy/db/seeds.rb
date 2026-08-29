@@ -23,8 +23,6 @@ legal   = User.create!(name: "Lena Petrova",   role: "legal",   email: "lena@exa
 it_lead = User.create!(name: "Ivan Torres",    role: "it",      email: "ivan@example.com")
 
 # One block instead of a template, two steps and a hand-written JSON Logic rule.
-# It reconciles rather than inserts, so this is safe on every deploy — the reset
-# above is only here to make the demo output deterministic.
 ApprovalEngine.define_flow "High-value invoice", tenant: TENANT, model: Invoice do
   on :create, when: { amount: { gt: 1_000 } }
   step "Manager sign-off", group: "manager"
@@ -32,8 +30,7 @@ ApprovalEngine.define_flow "High-value invoice", tenant: TENANT, model: Invoice 
 end
 
 # The same idea one size up: Legal and IT review at the same time, and both must
-# sign off before it reaches the CFO. This is the shape that is genuinely tedious
-# to hand-roll, so the demo should show it.
+# sign off before it reaches the CFO.
 ApprovalEngine.define_flow "Major capital spend", tenant: TENANT, model: Invoice do
   on :create, when: { amount: { gt: 100_000 } }, priority: 10
   step "Manager sign-off", group: "manager"

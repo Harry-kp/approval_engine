@@ -1,9 +1,7 @@
 require "test_helper"
 
 module ApprovalEngine
-  # Reminders. The guiding rule: a nudge is not a verdict, and a nudge fires
-  # once. A sweep that runs every ten minutes must never mail someone every ten
-  # minutes — that is the whole reason `reminded_at` exists.
+  # Reminders.
   class ReminderTest < ApprovalEngine::TestCase
     setup do
       @invoice  = Invoice.create!(tenant_id: TENANT, amount: 6000)

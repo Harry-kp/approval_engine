@@ -1,23 +1,19 @@
 module ApprovalEngine
   module Admin
-    # Runtime CRUD for the routing rules — the claim the README makes, made
-    # true: which template an event picks, under what condition, is data an
-    # admin edits, not code someone deploys.
+    # Runtime CRUD for routing rules: which template an event picks, and under
+    # what condition, is data an admin edits rather than code someone deploys.
     class TriggerRulesController < BaseController
       PAGE_LIMIT = 100
-      # How many empty condition rows the form offers. "Add another condition"
-      # without JavaScript is just a few spare rows; blank ones are dropped.
+      # "Add another condition" without JavaScript is just spare rows.
       BLANK_CONDITION_ROWS = 3
-      # A condition is an AST an admin types; a jsonb column will accept a novel
-      # of one. Cap it so a pasted mistake can't slow every event down.
+      # jsonb will accept a novel; cap it so a paste can't slow every event.
       MAX_CONDITION_BYTES = 8_192
 
       before_action :set_track_template, except: :index
       before_action :set_trigger_rule, only: %i[edit update destroy]
 
       def index
-        # event_name asc, priority desc — the order the evaluator resolves them
-        # in, so the list reads the way the engine decides.
+        # The order the evaluator resolves them in.
         @tenant_id = params[:tenant_id].presence
         scope = TriggerRule.includes(:track_template).order(:event_name).by_priority
         scope = scope.for_tenant(@tenant_id) if @tenant_id
@@ -59,12 +55,10 @@ module ApprovalEngine
       end
 
       def destroy
-        # An Approval keeps the rule that routed it as provenance, on a foreign
-        # key declared `on_delete: :nullify` — so destroying a rule does not
-        # error, it quietly erases "which rule started this?" from every
-        # approval it ever spawned. Deactivating stops it matching anything new
-        # and keeps the history, which is the same trade the template's delete
-        # guard makes and the same one `FlowDefinition#reconcile_rules!` makes.
+        # The provenance FK is `on_delete: :nullify`, so deleting a rule
+        # silently erases which rule routed every approval it spawned.
+        # Deactivating keeps the history — as the template guard and
+        # FlowDefinition#reconcile_rules! both do.
         if routed_approvals?
           redirect_to admin_track_template_path(@track_template),
                       alert: "This rule has already routed approvals. Untick Active instead — " \
@@ -89,9 +83,7 @@ module ApprovalEngine
         Approval.where(approval_engine_trigger_rule_id: @trigger_rule.id).exists?
       end
 
-      # Tolerant of a missing `trigger_rule` key because `new` and `edit` render
-      # the same condition editor as `create` and `update`, and read the mode
-      # back out of it.
+      # Tolerant of a missing key: `new`/`edit` render the same editor.
       def trigger_rule_params
         @trigger_rule_params ||= params.fetch(:trigger_rule, ActionController::Parameters.new)
                                        .permit(:tenant_id, :event_name, :priority, :active,
@@ -99,8 +91,8 @@ module ApprovalEngine
                                                conditions: [ :field, :operator, :value ])
       end
 
-      # The condition is assembled, never mass-assigned: the form submits either
-      # triples or raw JSON, and neither is the column's value.
+      # Assembled, never mass-assigned — the form submits triples or raw JSON,
+      # and neither is the column's value.
       def rule_attributes
         trigger_rule_params.except(:condition_mode, :condition_json, :conditions)
       end
@@ -109,9 +101,8 @@ module ApprovalEngine
         trigger_rule_params[:condition_mode] == "advanced"
       end
 
-      # Whatever the form submitted, rendered down to the AST the column stores.
-      # Returns nil with `@condition_error` set when the input can't be read, so
-      # the action re-renders the form instead of blowing up on the admin.
+      # nil with `@condition_error` set when unreadable, so the action
+      # re-renders the form rather than blowing up on the admin.
       def submitted_condition
         advanced_mode? ? parsed_raw_condition : built_condition
       end
@@ -121,10 +112,8 @@ module ApprovalEngine
         raise ArgumentError, "is too large (max #{MAX_CONDITION_BYTES} bytes)" if json.bytesize > MAX_CONDITION_BYTES
 
         parsed = JSON.parse(json)
-        # A jsonb column will happily store an array or a bare number, and JSON
-        # Logic evaluates a non-object as a literal — a rule like that matches
-        # *every* event of its name. Reject it here rather than ship a rule that
-        # silently routes everything.
+        # JSON Logic evaluates a non-object as a literal, so an array or bare
+        # number would match *every* event of its name.
         raise ArgumentError, %(must be a JSON Logic object, e.g. {">": [{"var": "amount"}, 10000]}) unless parsed.is_a?(Hash)
 
         parsed
@@ -145,20 +134,18 @@ module ApprovalEngine
         end
         ApprovalEngine::Condition.to_json_logic(conditions)
       rescue ArgumentError => e
-        # Condition raises for a blank field, an unknown operator, or no rows.
+        # Condition raises for a blank field, bad operator, or no rows.
         @condition_error = e.message
         nil
       end
 
-      # Blank rows are how the form offers "add another condition" with no
-      # JavaScript, so they're dropped rather than validated.
+      # Blank rows are the JavaScript-free "add another", so drop them.
       def submitted_condition_rows
         Array(trigger_rule_params[:conditions]).reject { |row| row[:field].blank? }
       end
 
-      # What the editor renders. A stored AST the simple form can't represent
-      # comes back from `Condition.parse` as nil — that is the signal to open in
-      # the raw editor rather than silently mangle a rule someone hand-wrote.
+      # `Condition.parse` returns nil for an AST the simple form can't hold —
+      # the signal to open the raw editor rather than mangle a hand-written rule.
       def prepare_condition_editor
         stored = @trigger_rule.condition
         parsed = ApprovalEngine::Condition.parse(stored)

@@ -1,13 +1,6 @@
 require "test_helper"
 
-# The packaging contract. Two things it protects:
-#
-# The metadata rubygems.org renders — those sidebar links are most people's
-# first navigation into the project, and a wrong or missing one is invisible
-# from inside the repository.
-#
-# And what actually ships. `spec.files` is a glob, and a glob that grows a
-# directory grows it permanently, for everyone who ever installs the gem.
+# The packaging contract.
 class GemspecTest < ActiveSupport::TestCase
   REPO_URL = "https://github.com/Harry-kp/approval_engine".freeze
 

@@ -1,13 +1,6 @@
 require "test_helper"
 
 # The documentation is API, and this is the test that treats it as one.
-#
-# A 1.x whose README's first code block raises NoMethodError is worse than no
-# release at all: it is the one error every new reader hits inside a minute, and
-# nothing in a normal test suite catches it, because the README is the only place
-# that code exists. So everything the README promises about names — config keys,
-# class methods, generators, images — is asserted here against what actually
-# ships.
 class DocsTest < ApprovalEngine::TestCase
   ROOT      = ApprovalEngine::Engine.root
   README    = ROOT.join("README.md")
@@ -16,9 +9,7 @@ class DocsTest < ApprovalEngine::TestCase
 
   RAW_ASSET_PREFIX = "https://raw.githubusercontent.com/Harry-kp/approval_engine/main/".freeze
 
-  # `config.key =` and `config.key -=` both name a key. The negative lookahead
-  # keeps `==` out; `[-+]?` lets `config.notification_events -= [...]` count,
-  # since dropping one event still asserts the key exists.
+  # `config.key =` and `config.key -=` both name a key.
   CONFIG_ASSIGNMENT = /config\.([a-z_]+)\s*[-+]?=(?!=)/
   # A commented-out example naming a key we never shipped is the same lie in
   # slower motion, so comments are scanned too — which the regex above already
@@ -58,7 +49,7 @@ class DocsTest < ApprovalEngine::TestCase
 
   # assets/ is deliberately not in spec.files, so a relative image path renders
   # nowhere except github.com — not on rubygems.org, not in a mirror, not in
-  # `bundle open`. Absolute raw URLs are the only ones that work everywhere.
+  # `bundle open`.
   test "every README image is an absolute URL" do
     each_match(README, MARKDOWN_IMAGE) do |url, line|
       assert url.start_with?("https://"),

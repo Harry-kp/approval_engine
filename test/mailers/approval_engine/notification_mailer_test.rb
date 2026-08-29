@@ -1,10 +1,7 @@
 require "test_helper"
 
 module ApprovalEngine
-  # The notifications themselves. The invariant every one of these defends: a
-  # template may only read the plain Strings the mailer precomputed, so the same
-  # six emails work in an app whose record has no `name`, no `title`, and a
-  # default Object#to_s.
+  # The notifications themselves.
   class NotificationMailerTest < ApprovalEngine::TestCase
     setup do
       @invoice  = Invoice.create!(tenant_id: TENANT, amount: 6000)
@@ -129,19 +126,15 @@ module ApprovalEngine
     end
 
     # "Drop a file in your app" is the whole answer to "how do I customise one
-    # email", so prove it rather than assuming it. The fixture lives at
-    # test/dummy/app/views/approval_engine/notification_mailer/ — the dummy is a
-    # host application, and its view path is searched before the engine's.
+    # email", so prove it rather than assuming it.
     test "a host's own copy of a template wins over the engine's" do
       mail = NotificationMailer.step_reassigned(@step, to: "manager@example.test")
 
       assert_match(/HOST OVERRIDE SENTINEL/, mail.body.to_s)
     end
 
-    # The documented pairing rule, pinned so it can't quietly stop being true:
-    # Action Mailer takes an action's templates from the first view path that has
-    # any of them, so the host's lone .text.erb above silences the engine's
-    # .html.erb too. Override both formats together, or accept a single part.
+    # Action Mailer takes an action's templates from the first view path holding
+    # any of them, so a lone .text.erb silences the engine's .html.erb.
     test "overriding one format of an action shadows the other" do
       mail = NotificationMailer.step_reassigned(@step, to: "manager@example.test")
 

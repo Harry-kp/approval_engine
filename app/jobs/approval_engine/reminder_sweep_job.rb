@@ -1,16 +1,12 @@
 module ApprovalEngine
-  # Periodic nudge for approvers who have gone quiet: fires the reminder signal
-  # for every pending step that has been waiting longer than
-  # `config.reminder_after`. Schedule it with whatever recurring mechanism you
-  # already run (solid_queue recurring tasks, sidekiq-cron, the `whenever` gem,
-  # a Kubernetes CronJob hitting a rake task, ...):
+  # Nudges approvers who have gone quiet longer than `config.reminder_after`.
+  # Schedule it with whatever recurring mechanism you already run:
   #
   #   ApprovalEngine::ReminderSweepJob.perform_later              # all tenants
   #   ApprovalEngine::ReminderSweepJob.perform_later(tenant_id: account.id)
   #
-  # Idempotent: each step is nudged at most once, so running it hourly only makes
-  # the nudge arrive sooner — it never mails the same person twice. A no-op until
-  # `config.reminder_after` is set, so scheduling it early is harmless.
+  # Each step is nudged at most once, and it is a no-op until `reminder_after`
+  # is set, so running it often and scheduling it early are both harmless.
   class ReminderSweepJob < ApplicationJob
     queue_as { ApprovalEngine.config.outbox_queue }
 

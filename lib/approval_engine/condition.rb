@@ -1,30 +1,17 @@
 module ApprovalEngine
-  # A single field/operator/value comparison, and the translation layer between
-  # that triple and the JSON Logic AST stored in `TriggerRule#condition`.
+  # Translates a field/operator/value triple to and from the JSON Logic AST
+  # stored in `TriggerRule#condition`. JSON Logic is the right storage format and
+  # the wrong authoring format — nobody hand-writes an AST in a form field.
   #
-  # JSON Logic is the right *storage* format — it is portable, safe to evaluate,
-  # and expressive enough for the rules people actually write. It is the wrong
-  # *authoring* format for a human: nobody should have to hand-write
-  # `{ ">" => [{ "var" => "amount" }, 10_000] }` in a form field or a seed file.
-  #
-  # So this class is the seam. It renders the common shapes down to JSON Logic
-  # and reads them back up, and it is deliberately honest about its limits: a
-  # condition it cannot represent round-trips as `nil` from `.parse`, which is
-  # the signal for the admin UI to fall back to a raw-JSON textarea rather than
-  # silently mangle a rule someone wrote by hand.
+  # Honest about its limits: anything it cannot represent parses back as `nil`,
+  # which tells the admin UI to fall back to a raw-JSON editor rather than
+  # silently mangle a hand-written rule.
   #
   #   Condition.new(field: "amount", operator: :gt, value: 10_000).to_json_logic
   #   # => { ">" => [{ "var" => "amount" }, 10_000] }
-  #
-  #   Condition.parse({ ">" => [{ "var" => "amount" }, 10_000] })
-  #   # => [#<Condition field="amount" operator=:gt value=10000>]
-  #
-  #   Condition.parse({ "some" => [...] })   # too complex for the simple form
-  #   # => nil
   class Condition
-    # Operators the simple form can express, mapped to their JSON Logic operator.
-    # `:not_in` has no direct operator — it is `in` wrapped in a negation — so it
-    # maps to nil and is special-cased on the way in and out.
+    # `:not_in` is `in` wrapped in a negation, so it maps to nil and is
+    # special-cased both ways.
     OPERATORS = {
       eq: "==",
       not_eq: "!=",
@@ -39,7 +26,7 @@ module ApprovalEngine
     # Operators whose value is a list rather than a scalar.
     LIST_OPERATORS = %i[in not_in].freeze
 
-    # Human labels for the operator dropdown, in the order they should appear.
+    # For the operator dropdown, in display order.
     LABELS = {
       eq: "is equal to",
       not_eq: "is not equal to",
@@ -53,11 +40,9 @@ module ApprovalEngine
 
     attr_reader :field, :operator, :value
 
-    # `type` mirrors the `exposes_for_approval` attribute types, so a value that
-    # arrives from an HTML form as the string "10000" is stored as the number
-    # 10_000 — otherwise JSON Logic would compare a number against a string and
-    # quietly never match. It defaults to nil, meaning "already the right type,
-    # leave it alone": code passing a literal 10_000 must not have it stringified.
+    # `type` mirrors the `exposes_for_approval` types, so form input of "10000"
+    # is stored as 10_000 — otherwise JSON Logic compares a string to a number
+    # and never matches. nil means "leave it alone", for values written in code.
     def initialize(field:, operator:, value:, type: nil)
       @field    = field.to_s
       @operator = operator.to_sym
@@ -88,13 +73,10 @@ module ApprovalEngine
     end
 
     class << self
-      # Reads a stored JSON Logic AST back into an array of Conditions, so an
-      # existing rule can be re-opened in the simple form. Returns nil — not an
-      # empty array — when the AST is anything this class cannot represent, so
-      # callers can tell "no conditions" from "too complex to show".
-      #
-      # Accepts a single comparison or an `and` of comparisons; an `or`, a
-      # nested `and`, arithmetic, or any unrecognised operator returns nil.
+      # Reads a stored AST back into Conditions. Returns nil — not [] — when the
+      # AST is anything this class cannot represent, so callers can tell "no
+      # conditions" from "too complex to show". Accepts one comparison or an
+      # `and` of them; anything else is nil.
       def parse(json_logic)
         return nil unless json_logic.is_a?(Hash) && json_logic.size == 1
 
@@ -105,16 +87,13 @@ module ApprovalEngine
         single ? [ single ] : nil
       end
 
-      # True when `parse` can round-trip this AST — i.e. the simple form can edit
-      # it without losing anything.
+      # True when the simple form can edit this AST without losing anything.
       def simple?(json_logic)
         !parse(json_logic).nil?
       end
 
-      # Renders one or more Conditions to a single stored AST. Multiple
-      # conditions are ANDed; that is the only combinator the simple form offers,
-      # because an OR builder is a materially different (and much larger) UI and
-      # raw JSON Logic remains available for it.
+      # Multiple conditions are ANDed — the only combinator the simple form
+      # offers. An OR builder is a much larger UI; raw JSON Logic covers it.
       def to_json_logic(conditions)
         conditions = Array(conditions)
         raise ArgumentError, "no conditions given" if conditions.empty?
@@ -123,16 +102,10 @@ module ApprovalEngine
         { "and" => conditions.map(&:to_json_logic) }
       end
 
-      # Builds conditions from the DSL's `when:` sugar, so a flow definition can
-      # say what it means:
+      # The DSL's `when:` sugar. A bare value means :eq; raw JSON Logic passes
+      # straight through. `types` maps field to exposure type for casting.
       #
-      #   when: { amount: { gt: 10_000 } }
       #   when: { amount: { gt: 10_000 }, region: { in: %w[EU UK] } }
-      #   when: { status: "pending" }                  # bare value means :eq
-      #   when: { ">" => [{ "var" => "amount" }, 1] }  # raw JSON Logic, passed through
-      #
-      # `types` maps field name to its declared exposure type so values cast the
-      # same way the payload does.
       def from(clause, types: {})
         raise ArgumentError, "condition can't be blank" if clause.blank?
         return clause if raw_json_logic?(clause)
@@ -156,9 +129,7 @@ module ApprovalEngine
 
       private
 
-      # A clause is already JSON Logic when its first key is an operator we would
-      # never accept as a field name. This keeps `from` usable as a single door
-      # for both the sugar and hand-written ASTs.
+      # Already JSON Logic when its only key is an operator, never a field name.
       def raw_json_logic?(clause)
         return false unless clause.is_a?(Hash) && clause.size == 1
 
@@ -173,7 +144,7 @@ module ApprovalEngine
         parsed.all? ? parsed : nil
       end
 
-      # One comparison, or a negated `in`. Returns nil for anything else.
+      # One comparison, or a negated `in`.
       def parse_comparison(clause)
         return nil unless clause.is_a?(Hash) && clause.size == 1
 
@@ -188,10 +159,9 @@ module ApprovalEngine
         return nil unless variable.is_a?(Hash) && variable.keys == [ "var" ]
         return nil if value.is_a?(Hash) # a comparison against another var is not simple
 
-        # JSON Logic overloads `in`: an Array operand is membership, a String
-        # operand is a substring test. The simple form only speaks membership,
-        # so a hand-written substring rule is reported as too complex rather
-        # than being read in and saved back out with different semantics.
+        # JSON Logic overloads `in`: Array is membership, String is substring.
+        # The simple form only speaks membership, so a substring rule is too
+        # complex rather than silently re-saved with different semantics.
         return nil if symbol == :in && !value.is_a?(Array)
 
         new(field: variable["var"], operator: symbol, value: value)
@@ -208,7 +178,7 @@ module ApprovalEngine
 
     private
 
-    # `:not_in` is stored as a negated `in`, so it borrows `in`'s operator.
+    # `:not_in` is stored as a negated `in`.
     def list_base_operator
       operator == :not_in ? :in : operator
     end
@@ -220,7 +190,7 @@ module ApprovalEngine
     end
 
     def cast_list(raw)
-      # A form submits "EU, UK" for a list; code passes an actual array.
+      # A form submits "EU, UK"; code passes an array.
       list = raw.is_a?(String) ? raw.split(",").map(&:strip).reject(&:empty?) : Array(raw)
       list.map { |item| cast_scalar(item) }
     end

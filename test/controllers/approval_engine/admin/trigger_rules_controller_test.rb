@@ -189,10 +189,7 @@ module ApprovalEngine
         assert_redirected_to admin_track_template_path(@template)
       end
 
-      # The sibling delete path refuses this, and reconcile_rules! deactivates
-      # rather than destroys, both because the provenance FK is on_delete:
-      # :nullify — a hard delete silently blanks "which rule started this?" on
-      # every approval the rule ever routed.
+      # The sibling delete path refuses this, and reconcile_rules!
       test "destroy refuses a rule that has already routed approvals" do
         create_user(role: :manager)
         rule = create_rule(template: @template, condition: { ">" => [ { "var" => "amount" }, 1 ] })

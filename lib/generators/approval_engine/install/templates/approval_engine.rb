@@ -22,19 +22,13 @@ ApprovalEngine.configure do |config|
   # ---------------------------------------------------------------------------
   # Notifications (opt-in, OFF by default)
   # ---------------------------------------------------------------------------
-  # The engine ships six emails: an approver is told they have work waiting, is
-  # nudged if they go quiet, and is told when an approval is handed to them; the
-  # requesting side is told when changes are requested, and when the approval is
-  # approved or rejected.
-  #
-  # This stays false on purpose. Your Step rows are assigned to real people, and
-  # an upgrade that starts mailing them — a backlog's worth on the first outbox
-  # drain — is not something you can take back. Turn it on deliberately.
+  # Six emails: work waiting, a nudge, a handover, changes requested, approved,
+  # rejected. False on purpose — your Step rows are assigned to real people, and
+  # an upgrade that starts mailing them is not something you can take back.
   config.notifications_enabled = false
 
-  # Enabling notifications ALSO needs a sender: either set config.mailer_from,
-  # or point config.parent_mailer at a mailer that already has `default from:`.
-  # Without one, Action Mailer has nothing to hand the SMTP server.
+  # Enabling ALSO needs a sender — Action Mailer has nothing to hand the SMTP
+  # server without one:
   #
   #   config.mailer_from   = "approvals@example.com"
   #   config.parent_mailer = "ApplicationMailer"   # adopts your layout + sender
@@ -42,50 +36,43 @@ ApprovalEngine.configure do |config|
   # Which of the six are live. Drop one to silence it:
   #   config.notification_events -= [ :step_reassigned ]
   #
-  # Where an approval is acted on. The engine can't know your routes, so until
-  # you set this the mail carries no link:
+  # Where an approval is acted on. Until set, the mail carries no link:
   #   config.approval_url_builder = ->(approval) do
   #     Rails.application.routes.url_helpers.invoice_url(approval.target)
   #   end
   #
-  # Who hears about an *approval-level* outcome (approved / rejected / changes
-  # requested). The engine knows who approves; only you know who asked. While
-  # this is nil, those three notifications are never sent:
+  # Who hears an approval-level outcome. The engine knows who approves; only you
+  # know who asked. While nil, those three are never sent:
   #   config.approval_recipients = ->(approval) { [ approval.target.submitter ] }
   #
-  # How an actor's address and display name are read, and how the record under
-  # approval names itself. The label defaults fall back to "Invoice #12":
+  # How an actor's address and name are read, and how the record names itself.
+  # Labels fall back to "Invoice #12":
   #   config.actor_email_method  = :email
   #   config.actor_label_method  = :full_name
   #   config.target_label_method = :reference
   #
-  # The mailer itself. Subclass ApprovalEngine::NotificationMailer to take one
-  # message over completely, or leave it and override the views in
-  # app/views/approval_engine/notification_mailer/ (override both formats of an
-  # action together, or the message loses a part):
+  # Subclass NotificationMailer to take a message over, or override views in
+  # app/views/approval_engine/notification_mailer/ (both formats together, or
+  # the message loses a part):
   #   config.mailer_class = "MyApprovalMailer"
   #   config.mailer_queue = :mailers
 
-  # How long a step may sit unanswered before ReminderSweepJob nudges its
-  # assignee, in seconds. nil = reminders off, so scheduling the job before
-  # setting this does nothing. Each step is nudged at most once.
+  # Seconds a step may sit before ReminderSweepJob nudges its assignee. nil =
+  # off, so scheduling the job alone does nothing. Nudged at most once.
   #   config.reminder_after = 2.days.to_i
   config.reminder_after = nil
 
-  # Mounts the built-in admin for templates, steps and routing rules — the
-  # write half of the dashboard, so admins can change routing without a deploy.
-  # Off by default: the dashboard is read-only until you opt in, and a gem
-  # upgrade must never turn a mounted dashboard into a write surface.
+  # Mounts the admin for templates, steps and rules — the write half of the
+  # dashboard. Off by default so an upgrade can't turn a read-only mount into a
+  # write surface.
   #
-  # THIS IS NOT AUTHENTICATION. It decides whether the write routes exist at
-  # all, not who may reach them. Anyone who can reach the mount can change what
-  # routes where, so wrap the mount in your own authenticated constraint:
+  # THIS IS NOT AUTHENTICATION. It decides whether the write routes exist, not
+  # who may reach them, so wrap the mount yourself:
   #
   #   authenticate :admin_user, ->(u) { u.super_admin? } do
   #     mount ApprovalEngine::Engine => "/approval_engine"
   #   end
   #
-  # Routes are drawn once at boot, so set this here (an initializer) and restart
-  # the server after changing it.
+  # Routes are drawn at boot, so restart after changing this.
   config.admin_enabled = false
 end

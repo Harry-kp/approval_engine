@@ -578,9 +578,7 @@ module ApprovalEngine
       before = template.template_steps.pluck(:name, :layer, :assigned_group).sort
 
       # A blank event name is caught by TriggerRule's own presence validation,
-      # i.e. after the template's status and both of its steps have already been
-      # rewritten — which is the case that proves the reconcile is one transaction
-      # rather than three independent writes.
+      # i.e.
       assert_no_difference row_counts do
         assert_raises(ActiveRecord::RecordInvalid) do
           ApprovalEngine.define_flow(FLOW, tenant: TENANT, model: Invoice, status: "archived") do
@@ -613,9 +611,7 @@ module ApprovalEngine
       assert_equal template, ApprovalEngine.flow(FLOW, tenant: TENANT)
       assert_nil ApprovalEngine.flow("Nothing defined", tenant: TENANT)
     end
-    # JSON Logic writes `var` three ways. Only the bare-name form was recognised,
-    # so a rule the evaluator handles fine was rejected at definition time, and
-    # the error blamed an attribute name nobody had typed.
+    # JSON Logic writes `var` three ways.
     test "accepts the var forms JSON Logic actually supports" do
       [
         { ">" => [ { "var" => [ "amount", 0 ] }, 10_000 ] },

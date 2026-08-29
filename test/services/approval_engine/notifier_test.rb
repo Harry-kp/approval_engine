@@ -164,10 +164,8 @@ module ApprovalEngine
       assert_equal "approvals_mail", enqueued_jobs.last[:queue]
     end
 
-    # The guard for the reason mail is enqueued rather than sent inside the
-    # relay: a broken notification must not fail the event, because the retry
-    # would re-run the host's callbacks — turning a mailer problem into a
-    # double-disbursed invoice.
+    # A broken notification must not fail the event: the retry would re-run the
+    # host's callbacks, turning a mailer problem into a business one.
     test "a broken notification is logged and never fails the outbox event" do
       enable!
       ApprovalEngine.config.mailer_class = "ApprovalEngine::NoSuchMailer"

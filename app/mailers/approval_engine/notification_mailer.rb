@@ -1,37 +1,27 @@
 module ApprovalEngine
-  # The engine's built-in notifications: the approver-facing half of the system
-  # that a host otherwise has to write from scratch.
+  # The built-in notifications. Dispatched by Notifier from inside
+  # ProcessOutboxJob, never a model callback, so a message is only built for
+  # state that has already committed.
   #
-  # Dispatched by Notifier from inside ProcessOutboxJob, never from a model
-  # callback — so a message is only ever built for state that has already
-  # committed, and a down SMTP server can't reach back into an approval.
+  # Every action takes an explicit `to:` and assigns only Strings and Integers,
+  # so no view calls a method on a host record — that is what makes these
+  # templates work for any application.
   #
-  # Every action takes an explicit `to:` (the notifier owns recipient resolution)
-  # and assigns nothing but plain Strings and Integers, so no view ever calls a
-  # method on a host record. That is what keeps these templates usable by any
-  # application, whatever its models happen to be called.
-  #
-  # To restyle one message, drop your own copy at
-  # app/views/approval_engine/notification_mailer/<action>.html.erb — your app's
-  # view path is searched before the engine's. Override *both* formats of an
-  # action together: Action Mailer takes an action's templates from the first
-  # view path that has any of them, so a lone .html.erb in your app silences the
-  # engine's .text.erb and leaves you with a single-part message. To replace one
-  # wholesale instead, subclass this and point `config.mailer_class` at it.
+  # To restyle one, drop your own copy at
+  # app/views/approval_engine/notification_mailer/<action>.html.erb. Override
+  # *both* formats together: Action Mailer takes an action's templates from the
+  # first view path holding any of them, so a lone .html.erb silences the
+  # engine's .text.erb. To replace one wholesale, subclass and point
+  # `config.mailer_class` at it.
   class NotificationMailer < ApprovalEngine.config.parent_mailer.constantize
-    # Only impose our own layout when we aren't inheriting the host's mailer — if
-    # they pointed `parent_mailer` at their ApplicationMailer, their layout and
-    # their `default from:` are the whole point of doing so.
+    # Only impose our layout when not inheriting the host's mailer — their
+    # layout and sender are the whole point of setting `parent_mailer`.
     layout "approval_engine/mailer" if superclass == ActionMailer::Base
 
-    # Action Mailer resolves templates from `self.class.mailer_name`, which for a
-    # subclass is the subclass's own path. Without this, the documented
-    # `config.mailer_class` route — subclass this, override one action — raises
-    # ActionView::MissingTemplate for that action *and* for the five inherited
-    # ones, because they would all look under `app/views/<your_mailer>/`.
-    # Pinning the path here means a subclass inherits the engine's views and
-    # overrides only what it actually rewrites. A host that wants its own
-    # templates still gets them: its view path is searched first.
+    # Action Mailer resolves templates from `self.class.mailer_name`, so without
+    # this a subclass looks under its own path and every action raises
+    # MissingTemplate. Pinned here, a subclass inherits the engine's views; a
+    # host's own still win, because its view path is searched first.
     default template_path: "approval_engine/notification_mailer"
 
     def step_activated(step, to:)
@@ -41,8 +31,7 @@ module ApprovalEngine
 
     def step_reminder(step, to:)
       assign_step(step)
-      # Rounded to whole hours because "it has been sitting for two days" is the
-      # point of a nudge; the arithmetic is not.
+      # Whole hours: "sitting for two days" is the point, not the arithmetic.
       @waiting_hours = (step.waiting_for / 3600.0).round if step.waiting_for
       notification_mail(to: to)
     end
@@ -84,10 +73,8 @@ module ApprovalEngine
       @url          = ApprovalEngine.config.approval_url(approval)
     end
 
-    # One funnel for all six. `from` is only set when the host configured one, so
-    # inheriting their mailer keeps whatever sender they already standardised on;
-    # the subject lives in the locale file, where they can rewrite it without
-    # touching the engine.
+    # One funnel for all six. `from` is set only when configured, so inheriting
+    # the host's mailer keeps their sender; subjects live in the locale file.
     def notification_mail(to:)
       headers = { to: to, subject: default_i18n_subject(target: @target_label) }
       headers[:from] = ApprovalEngine.config.mailer_from if ApprovalEngine.config.mailer_from.present?

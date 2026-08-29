@@ -1,24 +1,12 @@
 require "test_helper"
 
 module ApprovalEngine
-  # The only test that touches global routing state. It proves the false branch
-  # of config/routes.rb — that the write endpoints do not exist at all for a
-  # host which never opts in — which nothing else in the suite can reach,
-  # because the dummy app opts in at boot.
+  # The only test that touches global routing state.
   class AdminRoutesTest < ActionDispatch::IntegrationTest
     include Engine.routes.url_helpers
 
     # Redraws the engine's routes with the admin back on, and — the part that
     # matters — leaves the reloader in a *loaded* state.
-    #
-    # `Rails.application.reload_routes!` sets `routes_reloader.loaded = false`
-    # whenever it had to execute the routes itself, which defers the next draw
-    # to whichever later test first touches a route helper. That draw re-reads
-    # `admin_enabled`, and ApprovalEngine::TestCase resets the configuration
-    # around every one of its tests — so the deferred draw would read the flag
-    # as false and silently strip the admin routes for the rest of the run.
-    # Consuming the deferred execution here, while the flag is true, is what
-    # makes this test safe to run in any order.
     def restore_admin_routes!
       ApprovalEngine.config.admin_enabled = true
       Rails.application.reload_routes!
@@ -30,9 +18,7 @@ module ApprovalEngine
       ApprovalEngine.config.admin_enabled = false
       Rails.application.reload_routes!
 
-      # Not "the controller refused" — the route does not exist. A request under
-      # the mount falls through the engine's router and 404s there, and the path
-      # helper is undefined because it was never generated.
+      # Not "the controller refused" — the route does not exist.
       get "/approval_engine/admin/track_templates"
       assert_response :not_found
       assert_not Engine.routes.url_helpers.respond_to?(:admin_track_templates_path)

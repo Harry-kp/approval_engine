@@ -1,45 +1,29 @@
 require "digest"
 
 module ApprovalEngine
-  # The declarative flow builder behind `ApprovalEngine.define_flow`. It
-  # reconciles a block of `on` / `step` / `parallel` declarations into the same
-  # TrackTemplate / TemplateStep / TriggerRule rows an admin would author by
-  # hand, so nothing downstream — ApprovalBuilder, the dashboard, the rule
-  # builder — can tell a seeded flow from a hand-built one.
+  # The declarative flow builder behind `ApprovalEngine.define_flow`. Reconciles
+  # a block of `on` / `step` / `parallel` declarations into ordinary
+  # TrackTemplate / TemplateStep / TriggerRule rows.
   #
-  # Everything it can catch, it catches at definition time. This is setup code a
-  # developer runs at deploy, so a typo should stop the seed with a sentence
-  # explaining itself — the exact opposite of runtime rule evaluation, which
-  # deliberately fails closed and silent so a bad rule can't 500 a host request.
-  #
-  # Re-running is safe. The flow is keyed on (tenant_id, name); steps are matched
-  # by name and updated in place so the ids an admin UI links to survive; and a
-  # rule the block stopped declaring is *deactivated*, never destroyed.
-  #
-  # An approval already in flight is untouched by any of that. ApprovalBuilder
-  # copies a template step's name/layer/consensus/timeout onto the ledger when it
-  # stamps the approval, and IterationBuilder clones a rework iteration from
-  # those ledger rows rather than from the template — so a running approval holds
-  # no live reference to anything this class rewrites, and finishes with the
-  # steps it started with.
+  # Keyed on (tenant_id, name), so re-running is safe. Fails loudly at definition
+  # time — this is deploy-time setup code, unlike runtime rule evaluation, which
+  # fails closed and silent. In-flight approvals are never affected:
+  # ApprovalBuilder copies template facts onto the ledger rather than holding a
+  # reference to them.
   class FlowDefinition
     class DefinitionError < ApprovalEngine::Error; end
 
-    # A rule needs a condition — TriggerRule validates its presence and {} is
-    # blank — so "route this event unconditionally" is spelled as a tautology.
+    # TriggerRule requires a condition, so "always" is spelled as a tautology.
     ALWAYS = { "==" => [ 1, 1 ] }.freeze
 
-    # The options `on` understands. Listed rather than taken as keywords because
-    # `when` is a Ruby keyword: `def on(event, when: nil)` parses but the value
-    # is unreachable as a local.
+    # Listed rather than taken as keywords: `when` is a Ruby keyword, so
+    # `def on(event, when: nil)` parses but the value is unreachable.
     RULE_OPTIONS = %i[when priority active].freeze
 
-    # Repeated verbatim from TemplateStep's validation so the same mistake reads
-    # the same wherever it surfaces.
+    # Verbatim from TemplateStep's validation, so the message never diverges.
     CONSENSUS_HINT = "must be :any, :all, :majority, a percentage like \"60%\", or a positive integer".freeze
 
-    # Named for what they are, not `Step`/`Rule`, so nothing in this file can
-    # accidentally read as the ledger's ApprovalEngine::Step.
+    # Not `Step`/`Rule`: nothing here should read as the ledger's Step.
     DeclaredStep = Struct.new(:name, :group, :layer, :approvals_required, :timeout_after, keyword_init: true)
     DeclaredRule = Struct.new(:event_name, :condition, :priority, :active, keyword_init: true)
 
@@ -49,8 +33,8 @@ module ApprovalEngine
       definition.commit!
     end
 
-    # The same coercion `Approvable#approval_tenant_id` does, plus `.to_s`
-    # because `tenant_id` is a string column the reconciler compares in Ruby.
+    # As `Approvable#approval_tenant_id`, plus `.to_s` — tenant_id is a string
+    # column the reconciler compares in Ruby.
     def self.tenant_id_for(tenant)
       tenant.respond_to?(:id) ? tenant.id.to_s : tenant.to_s
     end
@@ -73,9 +57,8 @@ module ApprovalEngine
 
     # --- block DSL -------------------------------------------------------
 
-    # One layer of approval. `group` is the name handed to the host's
-    # `resolve_approval_group(group_name, target)`; the engine expands it into
-    # one step per actor that returns.
+    # One layer. `group` goes to the host's `resolve_approval_group`, which the
+    # engine expands into one step per actor returned.
     def step(name, group:, approvals_required: nil, timeout_after: nil)
       if @open_layer && approvals_required
         raise DefinitionError,
@@ -98,18 +81,14 @@ module ApprovalEngine
       )
     end
 
-    # Steps that run at the same time, as one layer of the track.
+    # Steps that open together, as one layer.
     #
-    # The consensus policy is declared here and never on the steps inside,
-    # because `Track#tally_for` reads a single spec for the whole layer and
-    # counts every actor in it — per-step specs would silently let whichever row
-    # came first decide for the others.
-    #
-    # The default is `:all`, not the engine's `:any`: "Legal and IT review at the
-    # same time" means both. Note the count is flat across the layer, so `:all`
-    # over a 3-person Legal group and a 2-person IT group needs all five. "One
-    # from each group" is a different shape — parallel *tracks*, which is
-    # `run_approval!(templates: [...])`, not a layer.
+    # Consensus belongs on the block, never the steps inside: `Track#tally_for`
+    # reads one spec per layer and counts every actor in it. That also makes the
+    # count flat across the layer — `:all` over a 3-person and a 2-person group
+    # needs all five. "One from each group" is parallel *tracks* instead:
+    # `run_approval!(templates: [...])`. Defaults to `:all`, not the engine's
+    # `:any`, because "Legal and IT review" means both.
     def parallel(approvals_required: :all, &block)
       raise DefinitionError, "parallel needs a block of steps." unless block
       raise DefinitionError, "parallel blocks can't be nested." if @open_layer
@@ -135,14 +114,10 @@ module ApprovalEngine
       guard_absolute_count_across_groups!(approvals_required, declared_here)
     end
 
-    # An absolute count reads as "flat across the layer", which is how
-    # `Track#tally_for` counts at runtime — but `ApprovalBuilder#guard_consensus!`
-    # validates the same count against each template step's *own* actor list
-    # before an approval is stamped. So `parallel(approvals_required: 2)` over
-    # two one-person groups looks resolvable, and then every approval raises
-    # BuilderError at build time instead. Rather than write a template that only
-    # fails later, and far from here, refuse it now: a relative spec expresses
-    # the same intent and is satisfiable however the groups resolve.
+    # A count reads as flat across the layer, but ApprovalBuilder validates it
+    # against each group's own members — so `parallel(approvals_required: 2)`
+    # over two one-person groups raises at every build. Refuse it here instead of
+    # writing a template that only fails later.
     def guard_absolute_count_across_groups!(spec, step_count)
       return unless step_count > 1
       return unless /\A\d+\z/.match?(spec.to_s)
@@ -154,11 +129,8 @@ module ApprovalEngine
             "#{spec} people. Use :all, :any, :majority or a percentage, which hold however the groups resolve."
     end
 
-    # A rule that routes an event to this flow. `event` is either a literal event
-    # name ("invoice.created") or a lifecycle symbol resolved through the model,
-    # which is how a rule and the engine stay reading from one source. Options
-    # are `when:`, `priority:` and `active:`; `when:` omitted means "always".
-    # May be called more than once — a template can carry several rules.
+    # A rule routing an event to this flow. `event` is an event name or a
+    # lifecycle symbol resolved through the model. May be called more than once.
     def on(event, **options)
       unknown = options.keys - RULE_OPTIONS
       if unknown.any?
@@ -199,22 +171,17 @@ module ApprovalEngine
 
     private
 
-    # Two deploys can run db/seeds.rb at the same time. Without this, the
-    # find-or-create in upsert_template! races into two templates with the same
-    # name. Scoped to this one flow so unrelated flows never contend, and
-    # released when the transaction ends.
+    # Two concurrent deploys both running db/seeds.rb would race
+    # upsert_template! into duplicate templates. Scoped per flow.
     def lock!
       key = Digest::SHA256.digest("approval_engine.flow:#{@tenant_id}:#{@name}").unpack1("q>")
-      # The key is coerced to an Integer immediately before interpolation, which
-      # is what makes this provably injection-free; the tenant and the name never
-      # reach the SQL themselves. `execute` rather than `select_value` because
-      # the function returns void, which has no ActiveRecord type to decode.
+      # Injection-free: the key is an Integer, and neither tenant nor name
+      # reaches the SQL. `execute` because the function returns void.
       ActiveRecord::Base.connection.execute("SELECT pg_advisory_xact_lock(#{key.to_i})")
     end
 
-    # There is no unique index on (tenant_id, name) — an existing install may
-    # already hold duplicates, so adding one could break a production migrate —
-    # which means the invariant is enforced here, and refuses to guess.
+    # No unique index on (tenant_id, name): an existing install may already hold
+    # duplicates, so adding one could break a production migrate.
     def upsert_template!
       matches = TrackTemplate.for_tenant(@tenant_id).where(name: @name).order(:created_at).to_a
 
@@ -230,14 +197,12 @@ module ApprovalEngine
       template
     end
 
-    # Steps are matched by name and updated in place, so re-running a seed keeps
-    # the ids an admin UI links to. Nothing outside the template points at a
-    # template step — ApprovalBuilder copies its facts onto the ledger when an
-    # approval is built — so rewriting them can never disturb an approval already
-    # in flight. Renaming a step therefore reads as a remove plus an add.
+    # Matched by name and updated in place, so ids an admin UI links to survive.
+    # Nothing outside the template references a template step, so rewriting these
+    # cannot disturb an in-flight approval. A rename reads as remove plus add.
     def reconcile_steps!(template)
-      # group_by, not index_by: a hand-built template can hold two steps with the
-      # same name, and index_by would keep the last and strand the other forever.
+      # group_by, not index_by: duplicate names are possible in a hand-built
+      # template, and index_by would strand all but the last.
       existing = template.template_steps.group_by(&:name)
 
       @declared_steps.each do |declared|
@@ -257,16 +222,11 @@ module ApprovalEngine
       template.template_steps.reset
     end
 
-    # Rules are updated and deactivated, never destroyed. An Approval keeps the
-    # rule that routed it as provenance, on a foreign key declared
-    # `on_delete: :nullify` — so destroying a rule would not error, it would
-    # quietly erase "which rule started this?" from every approval it ever
-    # spawned. Deactivating stops it routing anything new, which is what dropping
-    # an `on` from a flow actually means.
-    #
-    # Asymmetric with steps on purpose: a template with no steps is always a bug,
-    # but a flow whose steps live in code and whose routing an admin owns in the
-    # UI is a legitimate shape, so a block with no `on` leaves rules alone.
+    # Deactivated, never destroyed: the provenance FK is `on_delete: :nullify`,
+    # so deleting a rule would silently erase which rule routed every approval it
+    # ever spawned. Asymmetric with steps on purpose — a template with no steps
+    # is a bug, but code-owned steps with admin-owned routing is legitimate, so a
+    # block with no `on` leaves rules alone.
     def reconcile_rules!(template)
       return if @declared_rules.empty?
 
@@ -323,8 +283,7 @@ module ApprovalEngine
       end
     end
 
-    # Condition.from raises ArgumentError for its own vocabulary problems; wrap
-    # them so a caller only ever has to rescue one error class.
+    # Wrap Condition.from's ArgumentError so callers rescue one error class.
     def compile_condition(event_name, clause)
       return ALWAYS if clause.blank?
 
@@ -335,10 +294,8 @@ module ApprovalEngine
       raise DefinitionError, "flow #{@name.inspect}: the when: for #{event_name.inspect} is invalid — #{e.message}."
     end
 
-    # Cast a `when:` value the same way the payload will be coerced, so a rule
-    # can never compare a number against a string and quietly never match. The
-    # default is :raw so a field the model doesn't declare passes through with
-    # whatever Ruby type the caller wrote.
+    # Cast as the payload will be, so a rule never compares a number to a string
+    # and silently never matches.
     def condition_types
       return Hash.new(:raw) unless @model.respond_to?(:approval_exposure)
 
@@ -347,9 +304,8 @@ module ApprovalEngine
       end
     end
 
-    # Every attribute name a condition reads, however deeply nested. Condition's
-    # own `parse` can't serve here: it returns nil for an `or` or a nested `and`,
-    # and hand-written raw JSON Logic is exactly where the typo lives.
+    # Every attribute a condition reads. Condition.parse can't serve: it returns
+    # nil for an `or`, which is exactly where a typo hides.
     def condition_vars(node)
       case node
       when Hash  then node.key?("var") ? Array(var_name(node["var"])) : node.values.flat_map { |value| condition_vars(value) }
@@ -358,12 +314,9 @@ module ApprovalEngine
       end
     end
 
-    # JSON Logic's `var` operand is not always a bare attribute name. It is also
-    # written `["amount", 0]` to supply a default, and `"line_item.total"` to
-    # walk into nested data — both of which the evaluator implements. Comparing
-    # either form verbatim against the exposure list rejected a rule that works,
-    # and blamed an attribute name nobody had written. An empty operand means
-    # "the whole payload", which reads nothing in particular, so it is skipped.
+    # `var` is also written `["amount", 0]` for a default and `"a.b"` for nested
+    # data. Comparing either verbatim rejected valid rules. An empty operand
+    # means the whole payload, so it names nothing.
     def var_name(operand)
       key = Array(operand).first.to_s
       return nil if key.empty?
@@ -377,9 +330,8 @@ module ApprovalEngine
       raise DefinitionError, "on: priority must be an integer, got #{value.inspect}."
     end
 
-    # Durations and plain second counts both land as an Integer of seconds, which
-    # is what the column holds. A zero or negative deadline would expire the step
-    # the moment it opened, so it is rejected rather than stored.
+    # Durations and plain counts both land as Integer seconds. A non-positive
+    # deadline would expire the step as it opened, so it is rejected.
     def seconds(value, label)
       return nil if value.nil?
 
@@ -433,8 +385,8 @@ module ApprovalEngine
                              "in config.approval_groups (#{known.join(", ")})."
     end
 
-    # Validate with Consensus, the same predicate the model and the Postgres
-    # check constraint use, so the DSL can never invent a second spelling.
+    # Consensus is what the model and the check constraint use, so the DSL
+    # cannot invent a second spelling.
     def guard_consensus!(subject, spec)
       return if Consensus.valid?(spec)
 
@@ -456,9 +408,8 @@ module ApprovalEngine
                              "Step names identify a step across re-runs, so they have to be unique within a flow."
     end
 
-    # The same check ApprovalBuilder makes at build time, brought forward: a
-    # missing resolver is a certainty rather than a possibility, so there is no
-    # reason to make the first approval discover it.
+    # ApprovalBuilder's check, brought forward — a missing resolver is certain,
+    # not possible, so the first approval shouldn't be the one to find out.
     def guard_actor_class!
       klass = begin
         ApprovalEngine.config.actor_class_constant
@@ -473,9 +424,8 @@ module ApprovalEngine
       raise DefinitionError, "#{klass} must define `self.resolve_approval_group(group_name, target)`."
     end
 
-    # A JSON Logic var that names nothing the model exposes reads as a clean
-    # non-match, so the rule just silently never fires. That is the right runtime
-    # behaviour and the wrong thing to discover in production.
+    # An unexposed var is a clean non-match at runtime, so the rule silently
+    # never fires — right behaviour, wrong thing to discover in production.
     def guard_exposed_attributes!(event_name, condition)
       return unless @model.respond_to?(:approval_exposure)
 
@@ -489,8 +439,7 @@ module ApprovalEngine
             "fix the name — an unexposed var reads as a clean non-match, so the rule would never fire."
     end
 
-    # on(:create) asks for auto-routing, so say so when the model isn't armed for
-    # it. Not fatal: plenty of hosts fire run_approval!(event:) themselves.
+    # Not fatal: plenty of hosts fire run_approval!(event:) themselves.
     def warn_unrouted_lifecycle(event)
       return unless event.is_a?(Symbol)
       return unless @model.respond_to?(:approval_trigger_events)
