@@ -158,6 +158,7 @@ rails db:migrate
 
 The generator copies migrations and an initializer, and prints next steps.
 
+
 ## Defining a flow
 
 A flow is three records: a template, its ordered steps, and the rule that says

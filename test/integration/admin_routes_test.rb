@@ -10,7 +10,10 @@ module ApprovalEngine
     def restore_admin_routes!
       ApprovalEngine.config.admin_enabled = true
       Rails.application.reload_routes!
-      Rails.application.reload_routes_unless_loaded
+      # Rails 8 only; on 7.x reload_routes! above already leaves them loaded.
+      if Rails.application.respond_to?(:reload_routes_unless_loaded)
+        Rails.application.reload_routes_unless_loaded
+      end
       admin_track_templates_path
     end
 

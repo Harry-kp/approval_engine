@@ -102,6 +102,14 @@ behaviour, and every new surface is off until you switch it on.
   build if the README documents a config key, an `ApprovalEngine` method, a
   generator, or an image that does not exist.
 
+### Fixed
+
+- Approvals attached to a host record whose primary key is a UUID silently lost
+  their target. The polymorphic reference columns were created by
+  `t.references`, which defaults to bigint, so a UUID cast to `0`: the row
+  saved, no error was raised, and `approval.target` read back `nil`. They are
+  string columns now, which fit a bigint, a UUID and a ULID alike.
+
 ### Upgrading from 1.0
 
 Nothing to do, and nothing to migrate before the gem will run. Both new

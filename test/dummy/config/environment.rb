@@ -12,4 +12,11 @@ Rails.application.initialize!
 # made the admin routes come and go with the Minitest seed. Drawing them here,
 # while the dummy's initializer opt-in is still in effect, reproduces what an
 # eager-loading production host gets at boot.
-Rails.application.reload_routes_unless_loaded
+#
+# `reload_routes_unless_loaded` is Rails 8; on 7.x drawing them is the
+# equivalent, and both are idempotent here.
+if Rails.application.respond_to?(:reload_routes_unless_loaded)
+  Rails.application.reload_routes_unless_loaded
+else
+  Rails.application.reload_routes!
+end

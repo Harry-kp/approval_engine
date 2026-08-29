@@ -1,4 +1,4 @@
-class AddEmailToUsers < ActiveRecord::Migration[8.1]
+class AddEmailToUsers < ActiveRecord::Migration[7.0]
   # The dummy actor needs a real address for the notification tests to resolve
   # one — `config.actor_email_method` defaults to :email.
   def change

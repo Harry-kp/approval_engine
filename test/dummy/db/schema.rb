@@ -20,7 +20,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_18_000002) do
     t.datetime "created_at", null: false
     t.string "event_name"
     t.string "status", default: "pending", null: false
-    t.bigint "target_id", null: false
+    t.string "target_id", null: false
     t.string "target_type", null: false
     t.string "tenant_id", null: false
     t.datetime "updated_at", null: false
@@ -30,17 +30,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_18_000002) do
     t.index ["target_type", "target_id"], name: "index_approval_engine_approvals_on_target"
     t.index ["tenant_id"], name: "index_approval_engine_approvals_on_tenant_id"
     t.check_constraint "approvals_required::text ~ '^([1-9][0-9]*%?|any|all|majority)$'::text", name: "chk_approval_engine_approval_approvals_required"
-    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'approved'::character varying, 'rejected'::character varying, 'quarantined'::character varying, 'cancelled'::character varying]::text[])", name: "chk_approval_engine_approval_status"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'approved'::character varying::text, 'rejected'::character varying::text, 'quarantined'::character varying::text, 'cancelled'::character varying::text])", name: "chk_approval_engine_approval_status"
   end
 
   create_table "approval_engine_audit_logs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.bigint "actual_actor_id"
+    t.string "actual_actor_id"
     t.string "actual_actor_type"
     t.uuid "approval_engine_step_id", null: false
     t.text "comment"
     t.datetime "created_at", null: false
     t.string "event", null: false
-    t.bigint "intended_actor_id"
+    t.string "intended_actor_id"
     t.string "intended_actor_type"
     t.string "tenant_id", null: false
     t.datetime "updated_at", null: false
@@ -53,9 +53,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_18_000002) do
   create_table "approval_engine_delegations", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.boolean "active", default: true, null: false
     t.datetime "created_at", null: false
-    t.bigint "delegatee_id", null: false
+    t.string "delegatee_id", null: false
     t.string "delegatee_type", null: false
-    t.bigint "delegator_id", null: false
+    t.string "delegator_id", null: false
     t.string "delegator_type", null: false
     t.datetime "ends_at", null: false
     t.datetime "starts_at", null: false
@@ -87,7 +87,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_18_000002) do
     t.datetime "activated_at"
     t.uuid "approval_engine_track_id", null: false
     t.string "approvals_required", default: "any", null: false
-    t.bigint "assigned_actor_id", null: false
+    t.string "assigned_actor_id", null: false
     t.string "assigned_actor_type", null: false
     t.datetime "created_at", null: false
     t.datetime "decided_at"
@@ -109,7 +109,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_18_000002) do
     t.index ["tenant_id", "assigned_actor_type", "assigned_actor_id", "status"], name: "idx_approval_engine_pending_tasks"
     t.index ["timeout_at"], name: "idx_ae_steps_overdue", where: "((timeout_at IS NOT NULL) AND (timed_out_at IS NULL))"
     t.check_constraint "approvals_required::text ~ '^([1-9][0-9]*%?|any|all|majority)$'::text", name: "chk_approval_engine_step_approvals_required"
-    t.check_constraint "status::text = ANY (ARRAY['waiting'::character varying, 'pending'::character varying, 'approved'::character varying, 'rejected'::character varying, 'changes_requested'::character varying, 'expired'::character varying, 'cancelled'::character varying]::text[])", name: "chk_approval_engine_step_status"
+    t.check_constraint "status::text = ANY (ARRAY['waiting'::character varying::text, 'pending'::character varying::text, 'approved'::character varying::text, 'rejected'::character varying::text, 'changes_requested'::character varying::text, 'expired'::character varying::text, 'cancelled'::character varying::text])", name: "chk_approval_engine_step_status"
   end
 
   create_table "approval_engine_template_steps", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -132,7 +132,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_18_000002) do
     t.string "tenant_id", null: false
     t.datetime "updated_at", null: false
     t.index ["tenant_id"], name: "index_approval_engine_track_templates_on_tenant_id"
-    t.check_constraint "status::text = ANY (ARRAY['draft'::character varying, 'active'::character varying, 'archived'::character varying]::text[])", name: "chk_approval_engine_template_status"
+    t.check_constraint "status::text = ANY (ARRAY['draft'::character varying::text, 'active'::character varying::text, 'archived'::character varying::text])", name: "chk_approval_engine_template_status"
   end
 
   create_table "approval_engine_tracks", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -144,7 +144,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_18_000002) do
     t.datetime "updated_at", null: false
     t.index ["approval_engine_approval_id", "status"], name: "idx_ae_tracks_approval_status"
     t.index ["approval_engine_approval_id"], name: "index_approval_engine_tracks_on_approval_engine_approval_id"
-    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'approved'::character varying, 'rejected'::character varying, 'cancelled'::character varying]::text[])", name: "chk_approval_engine_track_status"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'approved'::character varying::text, 'rejected'::character varying::text, 'cancelled'::character varying::text])", name: "chk_approval_engine_track_status"
   end
 
   create_table "approval_engine_trigger_rules", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|

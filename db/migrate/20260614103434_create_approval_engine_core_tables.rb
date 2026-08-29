@@ -1,10 +1,14 @@
 class CreateApprovalEngineCoreTables < ActiveRecord::Migration[7.0]
+  # Host records are referenced polymorphically, so these columns have to hold
+  # whatever the approved models use as a primary key. String fits a bigint, a
+  # UUID and a ULID alike; `t.references`' bigint default would cast a UUID to 0
+  # and silently lose the target.
   def change
     # The orchestrator. One per host record + event. Holds the parallel
     # track tracks and the overall outcome.
     create_table :approval_engine_approvals, id: :uuid do |t|
       t.string :tenant_id, null: false, index: true
-      t.references :target, polymorphic: true, null: false, index: true
+      t.references :target, polymorphic: true, type: :string, null: false, index: true
       t.string :status, null: false, default: "pending", index: true
       t.string :event_name
 
@@ -33,7 +37,7 @@ class CreateApprovalEngineCoreTables < ActiveRecord::Migration[7.0]
       t.string :status, null: false, default: "pending", index: true
       # How many approvals this step's layer needs: any | all | majority | "60%" | "2".
       t.string :approvals_required, null: false, default: "any"
-      t.references :assigned_actor, polymorphic: true, null: false
+      t.references :assigned_actor, polymorphic: true, type: :string, null: false
 
       # Cycle-time facts for latency/bottleneck reporting: when the step became
       # actionable (pending), and when a human resolved it. Both stay null while
@@ -61,10 +65,10 @@ class CreateApprovalEngineCoreTables < ActiveRecord::Migration[7.0]
       t.string :tenant_id, null: false
       t.references :approval_engine_step, null: false, foreign_key: true, type: :uuid
       t.string :event, null: false
-      t.references :intended_actor, polymorphic: true, null: true
+      t.references :intended_actor, polymorphic: true, type: :string, null: true
       # Nullable: system events (e.g. a step timing out) have no human actor —
       # the ledger records that honestly rather than fabricating one.
-      t.references :actual_actor, polymorphic: true, null: true
+      t.references :actual_actor, polymorphic: true, type: :string, null: true
       t.text :comment
 
       t.timestamps
