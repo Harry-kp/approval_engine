@@ -20,8 +20,15 @@ Configure this repo as a **trusted publisher** for the gem (no API key needed):
 ## Cutting a release
 
 1. Update `lib/approval_engine/version.rb`.
-2. Move the `CHANGELOG.md` `[Unreleased]` notes under a new
-   `## [x.y.z] - YYYY-MM-DD` heading.
+2. Add a `## [x.y.z] - YYYY-MM-DD` section to `CHANGELOG.md`, directly above the
+   previous release, plus a matching `[x.y.z]: .../releases/tag/vX.Y.Z` link
+   reference at the bottom of the file (`test/docs_test.rb` fails the build if a
+   version heading has no link reference). This file keeps no `[Unreleased]`
+   section: notes are written under their version when the release is cut.
+
+   The date must be the day you push the tag. `release.yml` fires on `v*` and
+   publishes within seconds, so a stale date is public before you notice and can
+   only be corrected by another commit.
 3. Commit, then tag and push:
 
    ```sh
