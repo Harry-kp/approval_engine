@@ -34,7 +34,7 @@ module ApprovalEngine
         else
           @trigger_rule.errors.add(:condition, @condition_error) if @condition_error
           prepare_condition_editor
-          render :new, status: :unprocessable_entity
+          render :new, status: 422
         end
       end
 
@@ -50,7 +50,7 @@ module ApprovalEngine
         else
           @trigger_rule.errors.add(:condition, @condition_error) if @condition_error
           prepare_condition_editor
-          render :edit, status: :unprocessable_entity
+          render :edit, status: 422
         end
       end
 

@@ -25,7 +25,7 @@ Gem::Specification.new do |spec|
   DESC
   spec.license = "MIT"
 
-  spec.required_ruby_version = ">= 3.1.0"
+  spec.required_ruby_version = ">= 3.2.0"
 
   # `source_code_uri` is pinned to the repository rather than derived from
   # `homepage`: moving the homepage some day must not silently repoint the
@@ -51,5 +51,7 @@ Gem::Specification.new do |spec|
   end
 
   spec.add_dependency "rails", ">= 7.1", "< 9.0"
-  spec.add_dependency "shiny_json_logic", "~> 0.3"
+  # Pinned to the patch series on purpose: pre-1.0 gems may break across a
+  # minor, and this one evaluates every routing rule. Widen deliberately.
+  spec.add_dependency "shiny_json_logic", "~> 0.3.6"
 end

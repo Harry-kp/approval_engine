@@ -13,6 +13,12 @@ behaviour, and every new surface is off until you switch it on.
 
 ### Added
 
+- `ApprovalEngine::OutboxEvent.purge!` — the outbox is a queue, not a ledger,
+  and nothing swept it: one row per activation, decision and outcome, kept
+  forever. Purges relayed events past a window (30 days by default), keeps dead
+  letters whatever their age, and never touches the audit trail.
+
+
 - `ApprovalEngine.define_flow(name, tenant:, model:)` — a declarative DSL for a
   whole flow (the template, its ordered steps, and the rules that route to it)
   in one block, instead of three `create!` calls whose relationship you have to
@@ -86,6 +92,14 @@ behaviour, and every new surface is off until you switch it on.
   `define_flow` may route to. `nil`, the default, means no vocabulary is declared
   and nothing is checked; set it and a `group:` typo stops the seed instead of
   resolving zero actors at build time.
+- `ApprovalEngine::TestHelpers` — test support for host applications, so an
+  adopter is not hand-rolling fixtures to test their own flow.
+  `approve_approval!` walks a flow to a decision, `reject_approval!` stops at
+  whatever is waiting, `pending_approval_steps` is the inbox for one record, and
+  `drain_approval_outbox!` relays the side-effects — without which
+  `after_approved` has genuinely not run yet, and a test asserting on it fails
+  for the right reason while looking like the wrong one. Actions and queries
+  rather than assertions, so they read the same under Minitest and RSpec.
 
 ### Changed
 
@@ -101,21 +115,19 @@ behaviour, and every new surface is off until you switch it on.
   `Alternatives` section naming the neighbours. `test/docs_test.rb` now fails the
   build if the README documents a config key, an `ApprovalEngine` method, a
   generator, or an image that does not exist.
-
-### Changed
-
+- **Minimum Ruby is now 3.2** and **PostgreSQL 13+ is stated explicitly.** 3.1
+  was claimed but never tested and is past end of life; the tables key on
+  `gen_random_uuid()`, which is core Postgres only from 13.
+- `shiny_json_logic` is pinned to `~> 0.3.6` rather than `~> 0.3`. It is pre-1.0
+  and evaluates every routing rule, so a floating minor could change matching
+  behaviour under an adopter on a routine `bundle update`.
+- The admin renders validation failures with `422` rather than
+  `:unprocessable_entity`, which Rack has deprecated and will remove — the
+  replacement symbol does not exist on Rails 7.1, so the number is the portable
+  spelling.
 - **Minimum Rails is now 7.1**, up from 7.0.8. The outbox relay's retry backoff
   uses `:polynomially_longer`, which 7.0 does not know, and 7.0 is past security
   support. CI now runs the whole supported range rather than one version of it.
-
-### Added
-
-- `ApprovalEngine::TestHelpers` — test support for host applications.
-  `approve_approval!` walks a flow to a decision, `reject_approval!` stops at
-  whatever is waiting, `pending_approval_steps` is the inbox for one record, and
-  `drain_approval_outbox!` relays the side-effects, without which `after_approved`
-  has genuinely not run yet. Actions and queries rather than assertions, so they
-  read the same under Minitest and RSpec.
 
 ### Fixed
 
