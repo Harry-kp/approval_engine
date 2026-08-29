@@ -213,7 +213,7 @@ and IT in parallel" to delegation and requesting changes.
 | --- | --- |
 | Auditability | Append-only `Step` ledger; requesting changes appends an iteration instead of editing history |
 | Concurrency | Approval-scoped pessimistic lock around every transition, so no double-approvals |
-| Routing | JSON Logic ASTs in `jsonb`, evaluated by [`shiny_json_logic`](https://rubygems.org/gems/shiny_json_logic) |
+| Routing | JSON Logic ASTs in `jsonb`, evaluated by [`shiny_json_logic`](https://jsonlogicruby.com) |
 | Side-effects | Transactional outbox relayed by ActiveJob, so a down API never rolls back an approval |
 | Safety | A malformed rule quarantines the approval instead of raising |
 
