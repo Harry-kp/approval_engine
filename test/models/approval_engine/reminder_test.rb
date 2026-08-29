@@ -135,5 +135,18 @@ module ApprovalEngine
       step.update_column(:activated_at, waiting_for.ago)
       step
     end
+    # Whoever now holds a stalled step is exactly the person who needs nudging,
+    # so handing it over restarts the clock rather than inheriting the previous
+    # assignee's stamp.
+    test "reassigning a step clears its reminder stamp" do
+      step = pending_step
+      step.update!(reminded_at: 1.hour.ago)
+      successor = create_user(role: :cfo, name: "Successor")
+
+      step.reassign!(to: successor)
+
+      assert_nil step.reload.reminded_at
+      assert_equal successor, step.assigned_actor
+    end
   end
 end

@@ -200,7 +200,10 @@ module ApprovalEngine
         end
 
         record_audit(event: "reassigned", by: by, comment: comment)
-        update!(assigned_actor: to)
+        # Clearing the nudge stamp restarts the reminder clock for whoever now
+        # holds the step. Keeping it would mean the person who was handed a
+        # stalled approval is the one person the sweep never reminds.
+        update!(assigned_actor: to, reminded_at: nil)
         emit_outbox("step.reassigned")
       end
       self
