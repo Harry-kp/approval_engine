@@ -35,14 +35,56 @@
     .ae-mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px; }
     .ae-card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 20px; margin-bottom:16px; }
     .ae-back { display:inline-block; margin-bottom:12px; }
+    /* Everything below is the opt-in admin. It is additive: a host that never
+       sets admin_enabled renders none of these classes. */
+    .ae-nav { margin-left:auto; display:flex; gap:16px; }
+    .ae-nav a { font-weight:500; color:#cbd5e1; }
+    .ae-flash { background:#dcfce7; border:1px solid #bbf7d0; color:#166534; border-radius:8px; padding:10px 16px; margin-bottom:16px; }
+    .ae-flash.is-alert { background:#fee2e2; border-color:#fecaca; color:#991b1b; }
+    .ae-errors { background:#fee2e2; border:1px solid #fecaca; color:#991b1b; border-radius:10px; padding:12px 16px; margin-bottom:16px; }
+    .ae-errors ul { margin:6px 0 0; padding-left:18px; }
+    .ae-form { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 20px; }
+    .ae-field { margin-bottom:14px; }
+    .ae-field label, .ae-form legend { display:block; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; margin-bottom:4px; }
+    .ae-form input[type=text], .ae-form input[type=number], .ae-form select, .ae-form textarea {
+      width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:6px; font:inherit; color:var(--ink); background:#fff; }
+    .ae-form textarea { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px; }
+    .ae-form fieldset { border:1px solid var(--line); border-radius:10px; padding:12px 16px; margin:0 0 16px; }
+    .ae-row { display:flex; gap:12px; flex-wrap:wrap; }
+    .ae-row .ae-field { flex:1 1 180px; }
+    .ae-hint { color:var(--muted); font-size:12px; margin:4px 0 0; }
+    .ae-actions { display:flex; gap:8px; align-items:center; margin-top:16px; }
+    .ae-btn { display:inline-block; background:var(--accent); color:#fff; border:0; border-radius:6px; padding:8px 16px; font:inherit; font-weight:600; text-decoration:none; cursor:pointer; }
+    .ae-btn.is-secondary { background:#fff; color:var(--ink); border:1px solid var(--line); }
+    .ae-btn.is-danger { background:#fff; color:#991b1b; border:1px solid #fecaca; }
+    .ae-cond-toggle { width:auto; }
+    .ae-cond label[for] { display:inline; text-transform:none; font-size:13px; color:var(--ink); margin-right:16px; }
+    /* The whole no-JavaScript trick: the radios are siblings of both panels, so
+       :checked ~ picks the one to show. Strip the CSS and both panels appear —
+       the server still obeys the submitted radio, so nothing is lost. */
+    .ae-cond-panel { display:none; }
+    #ae-cond-simple:checked ~ .ae-cond-panel.is-simple { display:block; }
+    #ae-cond-advanced:checked ~ .ae-cond-panel.is-advanced { display:block; }
   </style>
 </head>
 <body>
   <header class="ae-top">
     <%= link_to "ApprovalEngine", root_path %>
     <span class="ae-tag">ops dashboard</span>
+    <% if admin_ui? %>
+      <nav class="ae-nav">
+        <%= link_to "Approvals", approvals_path %>
+        <%= link_to "Templates", admin_track_templates_path %>
+        <%= link_to "Rules", admin_trigger_rules_path %>
+      </nav>
+    <% end %>
   </header>
   <main>
+    <% if admin_ui? %>
+      <% flash.each do |type, message| %>
+        <div class="ae-flash <%= "is-alert" if type.to_s == "alert" %>"><%= message %></div>
+      <% end %>
+    <% end %>
     <%= yield %>
   </main>
 </body>

@@ -1,4 +1,4 @@
-class CreateInvoices < ActiveRecord::Migration[8.1]
+class CreateInvoices < ActiveRecord::Migration[7.0]
   def change
     create_table :invoices do |t|
       t.string :tenant_id

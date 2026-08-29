@@ -1,0 +1,3 @@
+<% if @step_name.present? || @track_name.present? %>
+  <p style="margin:0 0 16px; color:#64748b; font-size:13px;"><%= [ @step_name, @track_name ].select(&:present?).join(" — ") %></p>
+<% end %>

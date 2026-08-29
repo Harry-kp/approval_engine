@@ -45,6 +45,17 @@ module ApprovalEngine
     def deliver(event)
       run_host_callbacks(event)
       broadcast_notification(event)
+      send_notifications(event)
+    end
+
+    # Built-in mail is a courtesy layered on top of the delivery contract, not
+    # part of it. A missing template or an unreachable actor must never fail the
+    # event, because a retry would re-run the host callbacks above — turning a
+    # mailer problem into a double-disbursed invoice.
+    def send_notifications(event)
+      Notifier.deliver(event)
+    rescue StandardError => e
+      Rails.logger&.warn("[ApprovalEngine] notification skipped for outbox event #{event.id}: #{e.class}: #{e.message}")
     end
 
     # Invoke the matching host callback if the target model chose to define one.
@@ -55,6 +66,8 @@ module ApprovalEngine
       return unless target
 
       case event.event_name
+      when "step.activated"            then try_call(target, :after_step_activated, record)
+      when "step.reminded"             then try_call(target, :on_step_reminder, record)
       when "step.approved"             then try_call(target, :after_step_approved, record)
       when "step.rejected"             then try_call(target, :after_step_rejected, record)
       when "step.changes_requested"    then try_call(target, :after_step_changes_requested, record)

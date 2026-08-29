@@ -1,0 +1,70 @@
+<%= form_with model: [ :admin, @track_template, @trigger_rule ], local: true, class: "ae-form" do |form| %>
+  <%= render "approval_engine/admin/shared/errors", record: @trigger_rule %>
+
+  <div class="ae-row">
+    <div class="ae-field">
+      <%= form.label :tenant_id %>
+      <%= form.text_field :tenant_id %>
+      <% if @trigger_rule.tenant_id.present? && @trigger_rule.tenant_id != @track_template.tenant_id %>
+        <p class="ae-hint">This differs from the template's tenant (<%= @track_template.tenant_id %>). The rule matches on
+        its own tenant but stamps this template's approval, so the two should normally agree.</p>
+      <% end %>
+    </div>
+
+    <div class="ae-field">
+      <%= form.label :event_name %>
+      <%= form.text_field :event_name, list: "ae-event-options" %>
+      <datalist id="ae-event-options">
+        <% known_event_names.each do |event_name| %>
+          <option value="<%= event_name %>"></option>
+        <% end %>
+      </datalist>
+      <p class="ae-hint">Any string your app triggers. The listed ones are what the engine fires by convention.</p>
+    </div>
+  </div>
+
+  <div class="ae-row">
+    <div class="ae-field">
+      <%= form.label :priority %>
+      <%= form.number_field :priority %>
+      <p class="ae-hint">Highest priority wins when several rules match one event.</p>
+    </div>
+
+    <div class="ae-field">
+      <%= form.label :active, "Active" %>
+      <%= form.check_box :active %>
+      <p class="ae-hint">An inactive rule is kept but never matched.</p>
+    </div>
+  </div>
+
+  <fieldset class="ae-cond">
+    <legend>Condition</legend>
+
+    <%= radio_button_tag "trigger_rule[condition_mode]", "simple", @condition_mode == "simple",
+          id: "ae-cond-simple", class: "ae-cond-toggle", disabled: !@condition_simple %>
+    <%= label_tag "ae-cond-simple", "Simple" %>
+    <%= radio_button_tag "trigger_rule[condition_mode]", "advanced", @condition_mode == "advanced",
+          id: "ae-cond-advanced", class: "ae-cond-toggle" %>
+    <%= label_tag "ae-cond-advanced", "Raw JSON Logic" %>
+
+    <div class="ae-cond-panel is-simple">
+      <% @condition_rows.each do |row| %><%= render "condition_row", row: row %><% end %>
+      <% @blank_rows.times do %><%= render "condition_row", row: {} %><% end %>
+      <p class="ae-hint">Several conditions must all match. For "or", use raw JSON Logic.</p>
+    </div>
+
+    <div class="ae-cond-panel is-advanced">
+      <% unless @condition_simple %>
+        <p class="ae-hint">This rule is more than the simple editor can show — an "or", a nested
+        group, or an operator it doesn't offer. Edit it as JSON Logic, or switch to Simple to
+        replace it entirely.</p>
+      <% end %>
+      <%= text_area_tag "trigger_rule[condition_json]", @condition_json, rows: 8, class: "ae-mono" %>
+    </div>
+  </fieldset>
+
+  <div class="ae-actions">
+    <%= form.submit "Save rule", class: "ae-btn" %>
+    <%= link_to "Cancel", admin_track_template_path(@track_template), class: "ae-btn is-secondary" %>
+  </div>
+<% end %>

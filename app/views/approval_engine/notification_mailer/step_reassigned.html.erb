@@ -1,0 +1,4 @@
+<p style="margin:0 0 16px;">Hello<%= " #{@actor_label}" if @actor_label.present? %>,</p>
+<p style="margin:0 0 8px;"><strong><%= @target_label %></strong> has been handed to you for approval. It is waiting on you now.</p>
+<%= render partial: "details", formats: [ :html ] %>
+<%= render partial: "call_to_action", formats: [ :html ] %>

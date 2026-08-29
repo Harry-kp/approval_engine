@@ -1,0 +1,29 @@
+<% content_for :title, "Rules" %>
+<h1>Rules</h1>
+<p class="ae-meta">Listed the way the evaluator resolves them: by event, then highest priority first.</p>
+
+<% if @trigger_rules.empty? %>
+  <div class="ae-empty">No rules<%= " for tenant #{@tenant_id}" if @tenant_id %>.</div>
+<% else %>
+  <table>
+    <thead>
+      <tr><th>Event</th><th>Priority</th><th>Condition</th><th>Template</th><th>Tenant</th><th>Active</th><th></th></tr>
+    </thead>
+    <tbody>
+      <% @trigger_rules.each do |rule| %>
+        <tr>
+          <td class="ae-mono"><%= rule.event_name %></td>
+          <td><%= rule.priority %></td>
+          <td><%= condition_summary(rule) %></td>
+          <td><%= link_to rule.track_template.name, admin_track_template_path(rule.track_template) %></td>
+          <td class="ae-mono"><%= rule.tenant_id %></td>
+          <td><%= rule.active? ? "Yes" : "No" %></td>
+          <td><%= link_to "Edit", edit_admin_track_template_trigger_rule_path(rule.track_template, rule) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+  <% if @total > @trigger_rules.size %>
+    <p class="ae-meta">Showing the most recent <%= @trigger_rules.size %> of <%= @total %>.</p>
+  <% end %>
+<% end %>

@@ -1,0 +1,1 @@
+<% if @url.present? %>Review it here: <%= @url %><% else %>Open <%= Rails.application.class.module_parent_name %> to review it — no approval link is configured yet (see config.approval_url_builder).<% end %>

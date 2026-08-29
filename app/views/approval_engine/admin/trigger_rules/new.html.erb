@@ -1,0 +1,4 @@
+<% content_for :title, "New rule" %>
+<%= link_to "← #{@track_template.name}", admin_track_template_path(@track_template), class: "ae-back" %>
+<h1>New rule</h1>
+<%= render "form" %>

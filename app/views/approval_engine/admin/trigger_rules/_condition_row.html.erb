@@ -1,0 +1,25 @@
+<div class="ae-row">
+  <div class="ae-field">
+    <%= label_tag nil, "Field" %>
+    <% if exposed_attribute_groups.any? %>
+      <%= select_tag "trigger_rule[conditions][][field]",
+            grouped_options_for_select(field_groups_including(row["field"]), row["field"]),
+            include_blank: "—", disabled: !@condition_simple %>
+    <% else %>
+      <%# Nothing has called exposes_for_approval yet, so there is nothing honest
+          to offer — fall back to free text rather than an empty dropdown. %>
+      <%= text_field_tag "trigger_rule[conditions][][field]", row["field"], disabled: !@condition_simple %>
+      <p class="ae-hint">No model declares <code>exposes_for_approval</code> yet.</p>
+    <% end %>
+  </div>
+  <div class="ae-field">
+    <%= label_tag nil, "Operator" %>
+    <%= select_tag "trigger_rule[conditions][][operator]",
+          options_for_select(ApprovalEngine::Condition::LABELS.map { |op, label| [ label, op.to_s ] }, row["operator"]),
+          disabled: !@condition_simple %>
+  </div>
+  <div class="ae-field">
+    <%= label_tag nil, "Value" %>
+    <%= text_field_tag "trigger_rule[conditions][][value]", row["value"], disabled: !@condition_simple %>
+  </div>
+</div>

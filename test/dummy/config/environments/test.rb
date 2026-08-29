@@ -6,6 +6,12 @@ require "active_support/core_ext/integer/time"
 # and recreated between test runs. Don't rely on the data there!
 
 Rails.application.configure do
+  # The committed schema.rb is stamped with whichever Rails dumped it, and the
+  # CI matrix runs several. Migrate instead of loading it, so an older Rails
+  # never chokes on a newer schema version — and so the migrations themselves
+  # are exercised on every Rails we claim to support.
+  config.active_record.maintain_test_schema = false
+
   # Settings specified here will take precedence over those in config/application.rb.
 
   # Turn false under Spring and add config.action_view.cache_template_loading = true.
@@ -32,7 +38,11 @@ Rails.application.configure do
   config.active_job.queue_adapter = :test
 
   # Raise exceptions instead of rendering exception templates.
-  config.action_dispatch.show_exceptions = false
+  # `:rescuable` renders a 404 for RecordNotFound while still raising real
+  # errors, which is what the admin's scoping tests assert. Rails 7.0 predates
+  # the symbol and spells the same intent `true`.
+  config.action_dispatch.show_exceptions =
+    Rails.gem_version >= Gem::Version.new("7.1") ? :rescuable : true
 
   # Disable request forgery protection in test environment.
   config.action_controller.allow_forgery_protection = false

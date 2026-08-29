@@ -1,7 +1,8 @@
 module ApprovalEngine
   # The dashboard's approval list and detail views. Read-only by design — its
   # job is to surface stuck, quarantined and in-flight work without anyone
-  # writing SQL, not to act on it.
+  # writing SQL, not to act on it. Writes live in the opt-in Admin namespace,
+  # and edit blueprints (templates and rules) rather than approvals in flight.
   class ApprovalsController < ApplicationController
     PAGE_LIMIT = 100
 

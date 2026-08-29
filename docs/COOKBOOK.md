@@ -13,7 +13,9 @@ Assumes you've armed a model and configured an actor class — see the
 - [Consensus](#consensus)
 - [Parallel review](#parallel-review)
 - [Delegation](#delegation)
+- [Withdrawing & escalating](#withdrawing--escalating)
 - [Side-effects & chaining](#side-effects--chaining)
+- [Notifications](#notifications)
 - [Integrating with your model's status](#integrating-with-your-models-status)
 - [Multi-tenancy](#multi-tenancy)
 - [Safety](#safety)
@@ -23,6 +25,123 @@ Assumes you've armed a model and configured an actor class — see the
 ---
 
 ## Routing & templates
+
+### "One flow shouldn't take four `create!` calls" (defining a flow in code)
+
+`ApprovalEngine.define_flow` writes the template, its ordered steps, and the
+rules that route to it in one block:
+
+```ruby
+# db/seeds.rb
+ApprovalEngine.define_flow "High-value invoice", tenant: "acme", model: Invoice do
+  on :create, when: { amount: { gt: 10_000 } }
+
+  step "Manager sign-off", group: "manager"
+  step "CFO sign-off",     group: "cfo"
+end
+```
+
+Each `step` is the next layer down, so that reads "Manager, then CFO". `on`
+takes a lifecycle symbol — resolved through `model:` into `"invoice.created"`,
+so the rule and the engine read from one source — or any event-name string you
+fire yourself, and it accepts `priority:` and `active:` as well as `when:`.
+`when:` is sugar over JSON Logic: `{ amount: { gt: 10_000 } }`,
+`{ department: "IT" }` for equality, `{ region: { in: %w[EU UK] } }` for a set.
+Several keys AND together, and raw JSON Logic passes straight through for
+anything the sugar can't say (an `or`, arithmetic).
+
+Same-layer review is a `parallel` block. Consensus is declared on the block
+rather than the steps inside it, because a layer carries one policy for every
+step in it — and it defaults to `:all`, since "Legal and IT review at the same
+time" means both:
+
+```ruby
+ApprovalEngine.define_flow "Major capital spend", tenant: "acme", model: Invoice do
+  on :create, when: { amount: { gt: 100_000 } }, priority: 10
+
+  step "Manager sign-off", group: "manager"
+  parallel(approvals_required: :all) do
+    step "Legal review", group: "legal"
+    step "IT review",    group: "it"
+  end
+  step "CFO sign-off", group: "cfo", timeout_after: 2.days
+end
+```
+
+A plain `step` also takes `approvals_required:` and `timeout_after:`; a
+flow-wide `define_flow(..., timeout_after:)` sets the default for every step
+that doesn't name its own.
+
+It writes ordinary `TrackTemplate` / `TemplateStep` / `TriggerRule` rows —
+nothing downstream can tell a defined flow from a hand-built one, and the
+[longhand below](#i-want-invoices-over-10k-to-need-extra-approval-conditional-routing)
+is the same thing spelled out. `define_flow` returns the template, and
+`ApprovalEngine.flow(name, tenant:)` looks one up later, which is how a defined
+flow reaches `run_approval!(templates: [...])`:
+
+```ruby
+contract.run_approval!(templates: [ ApprovalEngine.flow("Legal", tenant: "acme"),
+                                    ApprovalEngine.flow("IT",    tenant: "acme") ])
+```
+
+This is setup code, so it fails loudly and early — the opposite of runtime rule
+evaluation, which deliberately fails closed and silent. A rule that reads an
+attribute the model doesn't expose, a consensus spec that isn't one, two steps
+with the same name, a group that isn't in `config.approval_groups`, a
+non-positive `timeout_after`: each stops the seed with a sentence explaining
+itself, instead of resolving into a flow that silently never fires.
+
+> **Put it in `db/seeds.rb`, not an initializer.** It opens a transaction and
+> takes an advisory lock, so it needs a live database connection —
+> `rails db:create` and `assets:precompile` don't have one.
+
+> **Never hand it user input.** `when:` accepts raw JSON Logic and stores it
+> verbatim. The vetted path for rules an admin authors is
+> [the rule editor](#an-admin-should-change-the-10k-threshold-without-a-deploy-the-rule-editor),
+> which is constrained on purpose.
+
+One flow is one template is one track. Scatter-gather *across* tracks can't be
+expressed in a block — a trigger rule structurally routes to exactly one
+template — so that stays `run_approval!(templates: [...])`, as above.
+
+Covered by [`test/services/approval_engine/flow_definition_test.rb`](https://github.com/Harry-kp/approval_engine/blob/main/test/services/approval_engine/flow_definition_test.rb).
+
+### "My seeds run on every deploy — won't that duplicate the flow?" (reconciling a definition)
+
+No. A flow is keyed on `(tenant, name)`, and `define_flow` reconciles what it
+finds rather than inserting: the block is the desired state, and re-running it
+with nothing changed changes nothing. What reconciles, exactly:
+
+| Declaration | On a re-run |
+| --- | --- |
+| The template | Found by `(tenant, name)`; its `status` is re-asserted, so a flow an admin archived comes back `active` |
+| A step | Matched **by name** and updated in place, so the ids an admin UI links to survive |
+| A renamed step | Reads as a remove plus an add — the name is the identity |
+| A step you stopped declaring | Destroyed |
+| A rule | Matched by `(event_name, priority)` and updated in place |
+| A rule you stopped declaring | **Deactivated, never destroyed** — an approval keeps its `trigger_rule` as provenance, so deleting it would erase "which rule started this?" from every approval it ever spawned |
+| A block with no `on` at all | Leaves existing rules alone, so routing can stay the admin's |
+
+Two deploys seeding at once take an advisory lock scoped to that one flow, so
+they can't race into two templates with the same name. If a tenant somehow
+already holds two templates with the name, `define_flow` refuses rather than
+guessing which one it owns.
+
+**An approval already in flight is untouched by any of it.** The ledger holds
+copies, not references: `ApprovalBuilder` stamps each template step's name,
+layer, consensus and timeout *onto* the `Step` rows when it builds an approval,
+and a rework iteration is cloned from those ledger rows rather than from the
+template. A running approval therefore holds no live reference to anything a
+redefinition rewrites, and finishes with the steps it started with — including
+a step you deleted from the flow this morning.
+
+The flip side: code and the UI can't half-own one flow, because the next run of
+the block re-asserts everything it declares. Pick an owner per flow. A block
+with no `on` is the useful middle — steps in code, routing in the admin.
+
+Covered by [`test/services/approval_engine/flow_definition_test.rb`](https://github.com/Harry-kp/approval_engine/blob/main/test/services/approval_engine/flow_definition_test.rb)
+("re-running the same flow changes nothing", "rewriting a flow leaves an
+approval already in flight untouched").
 
 ### "I want invoices over $10k to need extra approval" (conditional routing)
 
@@ -484,9 +603,10 @@ end
 ```
 
 Other hooks: `after_rejected(reason)`, `after_cancelled(reason)`,
-`after_step_approved(step)`, `after_step_rejected(step)`,
-`after_step_changes_requested(step)`, `after_step_expired(step)`,
-`after_step_reassigned(step)`, `on_step_timeout(step)`, `on_quarantined(reason)`.
+`after_step_activated(step)`, `after_step_approved(step)`,
+`after_step_rejected(step)`, `after_step_changes_requested(step)`,
+`after_step_expired(step)`, `after_step_reassigned(step)`, `on_step_timeout(step)`,
+`on_step_reminder(step)`, `on_quarantined(reason)`.
 
 Callbacks fire through the outbox: **at-least-once and unordered**. Make them
 idempotent, and don't assume one fires before another (e.g. `after_step_approved`
@@ -513,11 +633,13 @@ The full channel list:
 | `approval_engine.approval.rejected` | an approval is rejected |
 | `approval_engine.approval.cancelled` | an approval is withdrawn via `cancel!` |
 | `approval_engine.approval.quarantined` | a malformed rule quarantined the approval |
+| `approval_engine.step.activated` | a step became actionable |
 | `approval_engine.step.approved` | a step is approved |
 | `approval_engine.step.rejected` | a step is rejected |
 | `approval_engine.step.changes_requested` | a step is sent back for rework |
 | `approval_engine.step.expired` | a step is expired (timed-out denial) |
 | `approval_engine.step.timed_out` | a step's SLA elapsed (signal only) |
+| `approval_engine.step.reminded` | the reminder sweep nudged a quiet step |
 | `approval_engine.step.reassigned` | a step was handed to another actor |
 
 ### "If Stripe is down, the approve click shouldn't 500" (async safety)
@@ -534,6 +656,182 @@ never bubbling into the approval.
 > **Schedule `ApprovalEngine::OutboxEvent.drain!`** (e.g. every few minutes) as a
 > safety net for events whose relay job was lost — required if your ActiveJob
 > adapter doesn't retry. It skips in-flight events, so it never double-delivers.
+
+---
+
+## Notifications
+
+The engine ships six emails and sends none of them until you say so. Everything
+in this section is inert while `config.notifications_enabled` is false, which is
+the default: upgrading the gem must never start mailing an adopter's real users.
+
+### "Tell the approver something is waiting on them" (turning notifications on)
+
+Three settings, and all three matter:
+
+```ruby
+# config/initializers/approval_engine.rb
+ApprovalEngine.configure do |config|
+  config.notifications_enabled = true                    # 1. the master switch
+  config.mailer_from           = "approvals@acme.com"    # 2. a sender
+  config.approval_url_builder  = lambda do |approval|    # 3. somewhere to go
+    Rails.application.routes.url_helpers.invoice_url(approval.target)
+  end
+end
+```
+
+1. **`notifications_enabled`** — nothing below it has any effect while this is
+   false.
+2. **A From address** — either `mailer_from`, or point `config.parent_mailer` at
+   your `ApplicationMailer` and inherit its `default from:` (and its layout,
+   which is usually the real reason to). Without one, Action Mailer has nothing
+   to hand the SMTP server, and the failure surfaces deep inside the delivery
+   job, far from the setting that caused it.
+3. **`approval_url_builder`** — the engine cannot know your routes. Without it
+   the mail still sends and arrives with nowhere to go.
+
+Who receives what:
+
+| Notification | Fires when | Goes to |
+| --- | --- | --- |
+| `step_activated` | a step becomes actionable | the assigned actor |
+| `step_reminder` | the sweep nudges a quiet step | the assigned actor |
+| `step_reassigned` | a step is handed to someone else | the new assignee |
+| `changes_requested` | a step is sent back for rework | `config.approval_recipients` |
+| `approval_approved` | an approval gathers to approved | `config.approval_recipients` |
+| `approval_rejected` | an approval is rejected | `config.approval_recipients` |
+
+The engine knows who approves; only you know who asked. So the bottom three stay
+silent — configured, enabled, and silent — until you say where they go:
+
+```ruby
+config.approval_recipients = ->(approval) { [ approval.target.submitter ] }
+```
+
+Addresses are read off an actor with `config.actor_email_method` (`:email` by
+default). An actor who has no address, or doesn't respond to the method at all,
+is skipped rather than raised on — and if that leaves no recipient, the
+notification is logged and dropped. A missing email is a configuration problem,
+not a reason to fail an approval.
+
+Mail rides the outbox you already have. `ApprovalEngine::Notifier` builds the
+message inside `ProcessOutboxJob` — so only ever from state that has already
+committed — and `deliver_later`s it, so a dead SMTP server retries the *mail*
+and never the outbox event (which would re-run your `after_approved` alongside
+it). A notification that raises is logged and dropped; it can never fail an
+approval. The cost is the outbox's own contract: delivery is at-least-once, so
+an approver may occasionally get the same message twice.
+
+Covered by [`test/services/approval_engine/notifier_test.rb`](https://github.com/Harry-kp/approval_engine/blob/main/test/services/approval_engine/notifier_test.rb)
+and [`test/mailers/approval_engine/notification_mailer_test.rb`](https://github.com/Harry-kp/approval_engine/blob/main/test/mailers/approval_engine/notification_mailer_test.rb).
+
+### "Nudge an approver who has gone quiet" (reminders)
+
+Set how long a step may sit unanswered, then run the sweep on whatever recurring
+mechanism you already have (solid_queue recurring tasks, sidekiq-cron, the
+`whenever` gem, a cron job hitting a rake task):
+
+```ruby
+config.reminder_after = 2.days.to_i   # nil, the default, means reminders off
+```
+
+```ruby
+ApprovalEngine::ReminderSweepJob.perform_later                  # all tenants
+ApprovalEngine::ReminderSweepJob.perform_later(tenant_id: account.id)
+ApprovalEngine::Step.sweep_reminders!                           # or synchronously
+```
+
+A nudge is not a verdict. Nothing about the step's authority changes and the
+only write is the `reminded_at` stamp that stops it being nudged again, so each
+step is reminded **at most once**: sweeping hourly makes the nudge arrive
+sooner, never twice. Requesting changes builds a fresh iteration of steps, which
+re-arms it. The sweep is a no-op while `reminder_after` is nil, so scheduling it
+before you configure the threshold is harmless, and one step raising is logged
+and skipped rather than starving the batch.
+
+`reminded_at` arrives in the 1.1 migration, so an app that upgrades the gem and
+forgets to migrate loses reminders (and nothing else — every other path stays
+away from the column):
+
+```sh
+rails approval_engine:install:migrations
+rails db:migrate
+```
+
+Reminders do not require the mailer. The sweep emits `step.reminded` through the
+outbox like any other event, so with notifications off you can nudge over Slack,
+push, or anything else from the host callback:
+
+```ruby
+class Invoice < ApplicationRecord
+  has_approvals
+
+  def on_step_reminder(step)
+    Slack.dm(step.assigned_actor, "Still waiting on you: #{self}")
+  end
+end
+```
+
+What counts as "late", and what to do about it beyond a nudge, stays yours —
+[timeouts](#approvers-should-have-a-deadline-timeouts) are the harder-edged
+tool, and they never decide either.
+
+Covered by [`test/models/approval_engine/reminder_test.rb`](https://github.com/Harry-kp/approval_engine/blob/main/test/models/approval_engine/reminder_test.rb).
+
+### "The mail should sound like us" (overriding the templates)
+
+Drop your own copy at
+`app/views/approval_engine/notification_mailer/<action>.html.erb`; your app's
+view path is searched before the engine's. There is no generator for this, and
+there doesn't need to be — the file path is the whole API.
+
+> **Override both formats of an action together.** Action Mailer takes an
+> action's templates from the first view path that has *any* of them, so a lone
+> `.html.erb` in your app silences the engine's `.text.erb` and leaves you with
+> a single-part message.
+
+The views assign nothing but plain Strings and Integers — no view ever calls a
+method on one of your records, which is what makes them usable by any app
+whatever its models are called. What you have to work with: `@target_label`,
+`@event_name`, `@url` everywhere; `@step_name`, `@track_name`, `@actor_label` on
+the four step messages; plus `@waiting_hours` (`step_reminder`), `@comment`
+(`changes_requested`) and `@reason` (`approval_rejected`).
+
+Subjects come from the locale file, so rewording one is a key in your own
+`en.yml` rather than a fork:
+
+```yaml
+en:
+  approval_engine:
+    notification_mailer:
+      step_activated:
+        subject: "%{target} needs your sign-off"
+```
+
+To take one message over entirely, subclass and point the config at it. The
+other five keep the engine's implementation:
+
+```ruby
+class ApprovalMailer < ApprovalEngine::NotificationMailer
+  def step_activated(step, to:)
+    mail(to: to, subject: "Sign off on #{step.name}")
+  end
+end
+
+config.mailer_class = "ApprovalMailer"
+```
+
+### "Send everything except reassignments" (silencing one notification)
+
+```ruby
+config.notification_events -= [ :step_reassigned ]
+```
+
+Two gates are checked before anything is built: the master switch, which keeps
+an upgrade silent, and this list, which mutes one message while the layer stays
+on. Removing an event here is not the same as removing the underlying signal —
+the outbox event, the `approval_engine.*` instrumentation, and your host
+callbacks all still fire.
 
 ---
 
@@ -669,9 +967,10 @@ end
 These aren't overrides — you simply *define* them and the engine calls them
 (see [Side-effects & chaining](#side-effects--chaining)):
 `after_approved`, `after_rejected(reason)`, `after_cancelled(reason)`,
-`on_quarantined(reason)`, `after_step_approved(step)`,
-`after_step_rejected(step)`, `after_step_changes_requested(step)`,
-`after_step_expired(step)`, `after_step_reassigned(step)`, `on_step_timeout(step)`.
+`on_quarantined(reason)`, `after_step_activated(step)`,
+`after_step_approved(step)`, `after_step_rejected(step)`,
+`after_step_changes_requested(step)`, `after_step_expired(step)`,
+`after_step_reassigned(step)`, `on_step_timeout(step)`, `on_step_reminder(step)`.
 
 ---
 
@@ -722,6 +1021,68 @@ end
 ```
 
 The dashboard's detail page also shows a **time-in-step** column per step.
+
+### "An admin should change the $10k threshold without a deploy" (the rule editor)
+
+The mounted dashboard is read-only. The write surface is a separate, opt-in
+admin at `/admin` inside the mount, and it is off by default:
+
+```ruby
+# config/initializers/approval_engine.rb
+ApprovalEngine.configure { |c| c.admin_enabled = true }
+```
+
+Routes are drawn once at boot, so that belongs in an initializer and needs a
+restart. While the flag is false the admin paths simply aren't there (404), and
+the controllers re-check it on every request rather than trusting boot time.
+
+What it gives an admin: templates, their steps, and their trigger rules, with
+full CRUD, plus a cross-template rule index ordered the way the evaluator
+resolves rules — `event_name` ascending, `priority` descending. Activating a
+draft template, retiring a rule, or moving a threshold are all writes, no deploy.
+
+The rule editor is a field/operator/value builder with no JavaScript in it. The
+field dropdown offers exactly what your models declared in
+`exposes_for_approval` — an unexposed variable reads as a clean non-match, which
+is the most common way a hand-typed rule silently never fires. The operators are
+`ApprovalEngine::Condition`'s (`eq`, `not_eq`, `gt`, `gte`, `lt`, `lte`, `in`,
+`not_in`), several rows AND together, and the value is cast to the attribute's
+declared type before storage, so `amount > "10000"` can't become a rule that
+compares a number against a string and quietly never matches.
+
+A condition the simple form can't represent — an `or`, a nested group, a
+substring `in` — opens in a raw JSON Logic textarea instead of being flattened
+into something it isn't. Raw input still has to parse, has to be a JSON object
+(a bare array or number would evaluate as a literal and match *every* event of
+its name), and is capped at 8 KB.
+
+> **`admin_enabled` is not authentication.** It decides whether the write routes
+> exist, not who may reach them, and the engine ships no auth of its own — so
+> the mount stays wrapped in your own constraint either way:
+>
+> ```ruby
+> authenticate :admin_user, ->(u) { u.super_admin? } do
+>   mount ApprovalEngine::Engine => "/approval_engine"
+> end
+> ```
+>
+> It is off by default for one reason: 1.0 shipped a read-only dashboard that
+> hosts mounted behind whatever auth they already had, and a gem upgrade must
+> never turn a read surface into a write one on its own. It also needs a
+> full-stack host — sessions for CSRF, and flash — so it is not available under
+> `config.api_only`.
+
+A template whose rules have already routed approvals refuses to be deleted, and
+says so: deleting it would cascade to its rules and nullify the provenance
+column on every approval they ever routed. Archive it instead — history wins
+over the delete.
+
+If the flow also lives in a `define_flow` block, remember that the next seed run
+re-asserts everything that block declares, including the threshold an admin just
+changed. [Pick one owner per flow](#my-seeds-run-on-every-deploy--wont-that-duplicate-the-flow-reconciling-a-definition).
+
+Covered by [`test/integration/admin_routes_test.rb`](https://github.com/Harry-kp/approval_engine/blob/main/test/integration/admin_routes_test.rb)
+and [`test/controllers/approval_engine/admin/`](https://github.com/Harry-kp/approval_engine/tree/main/test/controllers/approval_engine/admin).
 
 ### "How long is each decision taking, and where is it stuck?" (cycle time)
 

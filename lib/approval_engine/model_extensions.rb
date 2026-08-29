@@ -15,6 +15,10 @@ module ApprovalEngine
     def has_approvals(on: [ :create ])
       include ApprovalEngine::Approvable
       self.approval_trigger_events = Array(on).freeze
+
+      # Remember the model so the admin can offer its exposed attributes as
+      # rule fields. Anonymous classes have no name to remember.
+      ApprovalEngine.register_approvable(name) if name
     end
   end
 end

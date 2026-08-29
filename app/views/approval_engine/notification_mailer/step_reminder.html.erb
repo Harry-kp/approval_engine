@@ -1,0 +1,4 @@
+<p style="margin:0 0 16px;">Hello<%= " #{@actor_label}" if @actor_label.present? %>,</p>
+<p style="margin:0 0 8px;"><strong><%= @target_label %></strong> is still waiting on your approval<%= ", and has been for about #{pluralize(@waiting_hours, "hour")}" if @waiting_hours %>.</p>
+<%= render partial: "details", formats: [ :html ] %>
+<%= render partial: "call_to_action", formats: [ :html ] %>

@@ -1,0 +1,25 @@
+<%= form_with model: [ :admin, @track_template ], local: true, class: "ae-form" do |form| %>
+  <%= render "approval_engine/admin/shared/errors", record: @track_template %>
+
+  <div class="ae-field">
+    <%= form.label :tenant_id %>
+    <%= form.text_field :tenant_id %>
+    <p class="ae-hint">Rules are matched per tenant. A template and its rules should normally share one.</p>
+  </div>
+
+  <div class="ae-field">
+    <%= form.label :name %>
+    <%= form.text_field :name %>
+  </div>
+
+  <div class="ae-field">
+    <%= form.label :status %>
+    <%= form.select :status, ApprovalEngine::TrackTemplate::STATUSES %>
+    <p class="ae-hint">Only <strong>active</strong> templates are ever selected by a rule — draft templates never fire, and archiving retires one without deleting the history it routed.</p>
+  </div>
+
+  <div class="ae-actions">
+    <%= form.submit "Save template", class: "ae-btn" %>
+    <%= link_to "Cancel", @track_template.persisted? ? admin_track_template_path(@track_template) : admin_track_templates_path, class: "ae-btn is-secondary" %>
+  </div>
+<% end %>

@@ -1,0 +1,44 @@
+<%= form_with model: [ :admin, @track_template, @template_step ], local: true, class: "ae-form" do |form| %>
+  <%= render "approval_engine/admin/shared/errors", record: @template_step %>
+
+  <div class="ae-row">
+    <div class="ae-field">
+      <%= form.label :name %>
+      <%= form.text_field :name %>
+    </div>
+
+    <div class="ae-field">
+      <%= form.label :layer %>
+      <%= form.number_field :layer, min: 1 %>
+      <p class="ae-hint">Layers run in order; every step sharing a layer runs at once.</p>
+    </div>
+  </div>
+
+  <div class="ae-field">
+    <%= form.label :assigned_group %>
+    <%= form.text_field :assigned_group %>
+    <p class="ae-hint">Passed to your actor class's <code>resolve_approval_group</code>, which decides who that name means.</p>
+  </div>
+
+  <div class="ae-field">
+    <%= form.label :approvals_required %>
+    <%= form.text_field :approvals_required, list: "ae-consensus-options" %>
+    <datalist id="ae-consensus-options">
+      <% %w[any all majority 60% 2].each do |option| %>
+        <option value="<%= option %>"></option>
+      <% end %>
+    </datalist>
+    <p class="ae-hint"><%= consensus_hint %></p>
+  </div>
+
+  <div class="ae-field">
+    <%= form.label :timeout_after, "Timeout after (seconds)" %>
+    <%= form.number_field :timeout_after, min: 0 %>
+    <p class="ae-hint">Leave blank for no deadline. 172800 is two days.</p>
+  </div>
+
+  <div class="ae-actions">
+    <%= form.submit "Save step", class: "ae-btn" %>
+    <%= link_to "Cancel", admin_track_template_path(@track_template), class: "ae-btn is-secondary" %>
+  </div>
+<% end %>

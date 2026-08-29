@@ -21,10 +21,18 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    name: test (ruby ${{ matrix.ruby }}, rails ${{ matrix.rails || 'latest' }})
     strategy:
       fail-fast: false
+      # The gemspec supports Rails >= 7.1, < 9.0. Pin one Rails per entry so
+      # that range is exercised rather than asserted; a bare RAILS_VERSION
+      # resolves to the newest release.
       matrix:
-        ruby: ["3.2", "3.3", "3.4"]
+        include:
+          - { ruby: "3.2", rails: "7.1" }
+          - { ruby: "3.3", rails: "7.2" }
+          - { ruby: "3.4", rails: "8.0" }
+          - { ruby: "3.4", rails: "" }
     services:
       postgres:
         image: postgres:16
@@ -39,6 +47,7 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432
+      RAILS_VERSION: ${{ matrix.rails }}
     steps:
       - uses: actions/checkout@v7
       - uses: ruby/setup-ruby@v1
@@ -46,6 +55,16 @@ jobs:
           ruby-version: ${{ matrix.ruby }}
           bundler-cache: true
       - name: Prepare database
-        run: bin/rails app:db:test:prepare
+        # Migrate rather than load schema.rb, which carries the Rails version
+        # that dumped it and so cannot be read by an older Rails in this matrix.
+        # The engine's and the dummy's migrations interleave by timestamp and
+        # run from separate paths, hence the second engine pass.
+        env:
+          RAILS_ENV: test
+        run: |
+          bin/rails app:db:create
+          bin/rails app:db:migrate
+          (cd test/dummy && bin/rails db:migrate)
+          bin/rails app:db:migrate
       - name: Run tests
         run: bin/rails app:test

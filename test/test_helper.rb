@@ -14,8 +14,8 @@ module ApprovalEngine
   module ApprovalFixtures
     TENANT = "tenant-1".freeze
 
-    def create_user(role:, name: role.to_s.titleize)
-      User.create!(name: name, role: role.to_s)
+    def create_user(role:, name: role.to_s.titleize, email: "#{role}@example.com")
+      User.create!(name: name, role: role.to_s, email: email)
     end
 
     # steps: array of hashes — { name:, layer:, group:, approvals_required: }

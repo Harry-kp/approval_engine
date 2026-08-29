@@ -5,6 +5,155 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-08-29
+
+Three things 1.0 left you to build: authoring a flow, editing routing rules in a
+browser, and telling anyone there was something waiting. Nothing in 1.0 changed
+behaviour, and every new surface is off until you switch it on.
+
+### Added
+
+- `ApprovalEngine.define_flow(name, tenant:, model:)` — a declarative DSL for a
+  whole flow (the template, its ordered steps, and the rules that route to it)
+  in one block, instead of three `create!` calls whose relationship you have to
+  already know:
+
+      ApprovalEngine.define_flow "High-value invoice", tenant: "acme", model: Invoice do
+        on :create, when: { amount: { gt: 10_000 } }
+
+        step "Manager sign-off", group: "manager"
+        step "CFO sign-off",     group: "cfo", timeout_after: 2.days
+      end
+
+  Each `step` is its own layer in declaration order; a `parallel(approvals_required:)`
+  block puts several in one layer, under one consensus policy. `on` takes a
+  lifecycle symbol resolved through `model:` or any event name you fire
+  yourself, plus `when:`, `priority:` and `active:`. Idempotent on
+  `(tenant_id, name)`: it reconciles the same rows rather than creating a second
+  flow, so a seed file can re-run on every deploy — steps are matched by name and
+  updated in place so the ids the admin UI links to survive, and a rule the block
+  stopped declaring is deactivated rather than destroyed. It needs a live
+  connection, so it belongs in `db/seeds.rb` or a rake task, not an initializer.
+  **In-flight approvals are untouched** — they were stamped from the blueprint at
+  build time and never re-read it. `TrackTemplate` / `TemplateStep` /
+  `TriggerRule` remain public API and are unchanged; `define_flow` writes exactly
+  the rows you would have. `ApprovalEngine.flow(name, tenant:)` reads the
+  template back, for `run_approval!(templates: [...])`.
+- `ApprovalEngine::Condition` — the translation layer between a
+  field/operator/value triple and the JSON Logic AST stored in
+  `TriggerRule#condition`, shared by the DSL's `when:` sugar and the admin rule
+  builder. It covers `eq`, `not_eq`, `gt`, `gte`, `lt`, `lte`, `in` and
+  `not_in`, ANDs multiple conditions together, and casts values to the types
+  `exposes_for_approval` declared so a rule can't compare a number against a
+  string and quietly never match. `Condition.parse` returns `nil` — not an empty
+  result — for an AST it cannot represent, so **a rule someone hand-wrote is
+  never silently flattened into something it isn't.**
+- A built-in admin UI for templates, their steps, and their trigger rules,
+  mounted under `/admin` inside the engine — the code behind the README's
+  standing claim that admins change routing without a deploy. Gated behind
+  `config.admin_enabled` (**default `false`**, so an existing 1.0 mount stays
+  read-only across the upgrade), re-checked per request rather than trusted from
+  boot, and drawn once at boot so it needs a restart. The rule editor is a
+  zero-JavaScript field/operator/value form whose field list comes from
+  `exposes_for_approval`, with an automatic fallback to a raw JSON Logic textarea
+  for any condition the simple form cannot represent. **Turning it on is not
+  authentication**: it decides whether the write routes exist, not who may reach
+  them, so the mount still needs your own constraint. The approvals dashboard
+  itself stays read-only.
+- Built-in notifications — six messages (`step_activated`, `step_reminder`,
+  `step_reassigned`, `changes_requested`, `approval_approved`,
+  `approval_rejected`) rendered in HTML and text by
+  `ApprovalEngine::NotificationMailer`, dispatched by `ApprovalEngine::Notifier`
+  from inside `ProcessOutboxJob` so mail rides the existing transactional outbox:
+  a flaky SMTP host retries with backoff and never touches the approval. Off
+  unless `config.notifications_enabled = true`: **upgrading does not start
+  emailing your users.** Enabling it also needs a From address (`mailer_from`, or
+  a `parent_mailer` that declares one) and `approval_url_builder`, without which
+  the mail arrives with nowhere to go; the three approval-level messages stay
+  silent until `approval_recipients` says who asked. Recipients otherwise resolve
+  off the actor via `actor_email_method` (`:email` by default), and an actor with
+  no address is skipped rather than raised on. Views are overridden by dropping
+  copies into `app/views/approval_engine/notification_mailer/`. Delivery is
+  at-least-once, as with every outbox event. The `approval_engine.*`
+  `ActiveSupport::Notifications` remain the escape hatch for hosts that would
+  rather send their own.
+- `ApprovalEngine::ReminderSweepJob` — nudges approvers who have gone quiet for
+  longer than `config.reminder_after` (nil by default, so scheduling the job
+  before setting it does nothing). Idempotent via a new `reminded_at` column on
+  steps, so each step is nudged at most once and running the sweep hourly only
+  makes the nudge arrive sooner.
+- `config.approval_groups` — an optional allowlist of the group names
+  `define_flow` may route to. `nil`, the default, means no vocabulary is declared
+  and nothing is checked; set it and a `group:` typo stops the seed instead of
+  resolving zero actors at build time.
+
+### Changed
+
+- `spec.summary` and `spec.description` now lead with what the gem does rather
+  than how it is built, so the RubyGems snippet reads as a problem instead of a
+  spec sheet. `documentation_uri` points at the cookbook, `source_code_uri` is
+  pinned to the repository rather than derived from `homepage`, and
+  `docs/ARCHITECTURE.md` / `docs/COOKBOOK.md` now ship inside the gem.
+- Rewrote the README around the problem it solves: the job in the first line,
+  screenshots of a real approval above the fold, a single-block 60-second
+  quickstart built on `define_flow`, an honest "what to do when a boolean flag
+  stops fitting" instead of a bullet sending most readers away, and an
+  `Alternatives` section naming the neighbours. `test/docs_test.rb` now fails the
+  build if the README documents a config key, an `ApprovalEngine` method, a
+  generator, or an image that does not exist.
+
+### Changed
+
+- **Minimum Rails is now 7.1**, up from 7.0.8. The outbox relay's retry backoff
+  uses `:polynomially_longer`, which 7.0 does not know, and 7.0 is past security
+  support. CI now runs the whole supported range rather than one version of it.
+
+### Added
+
+- `ApprovalEngine::TestHelpers` — test support for host applications.
+  `approve_approval!` walks a flow to a decision, `reject_approval!` stops at
+  whatever is waiting, `pending_approval_steps` is the inbox for one record, and
+  `drain_approval_outbox!` relays the side-effects, without which `after_approved`
+  has genuinely not run yet. Actions and queries rather than assertions, so they
+  read the same under Minitest and RSpec.
+
+### Fixed
+
+- Step notifications ignored delegations. A delegate can act on a step, so
+  mailing only the assignee told the person who was away and not the person who
+  could do something about it. Both are notified now.
+- The `changes_requested` email named the step's assignee rather than whoever
+  actually asked for changes, which is recorded on the ledger and is who the
+  reader needs.
+- The condition size cap applied only to the raw JSON editor, so the simple
+  builder could store an unbounded condition on the same hot path.
+- Approvals attached to a host record whose primary key is a UUID silently lost
+  their target. The polymorphic reference columns were created by
+  `t.references`, which defaults to bigint, so a UUID cast to `0`: the row
+  saved, no error was raised, and `approval.target` read back `nil`. They are
+  string columns now, which fit a bigint, a UUID and a ULID alike.
+
+### Upgrading from 1.0
+
+Nothing to do, and nothing to migrate before the gem will run. Both new
+surfaces default to off: no mail is sent and no write endpoint exists until you
+ask for them. **Nothing that touches your users or calls your code turns itself
+on because you bumped a version.**
+
+One thing does change without asking, and it is worth knowing about. The ledger
+now emits a `step.activated` outbox event when a step becomes actionable —
+roughly one extra outbox row and relay job per step. It reaches your app only if
+you subscribe to it: `ActiveSupport::Notifications` subscribers matching
+`approval_engine.*` will start seeing `approval_engine.step.activated`, and a
+model that happens to define `after_step_activated(step)` will start having it
+called. If neither is true of your app, the only difference is the extra rows.
+
+There is one new migration, and only the reminder sweep reads the column it
+adds, so it is needed when you want reminders and not before:
+
+    bin/rails approval_engine:install:migrations
+    bin/rails db:migrate
+
 ## [1.0.0] - 2026-06-17
 
 First public release. The API below is stable.
@@ -135,4 +284,5 @@ First public release. The API below is stable.
 - A misconfigured `actor_class` now raises an actionable `BuilderError` naming
   the setting, instead of a raw `NameError`.
 
+[1.1.0]: https://github.com/Harry-kp/approval_engine/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Harry-kp/approval_engine/releases/tag/v1.0.0

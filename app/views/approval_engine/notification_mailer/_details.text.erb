@@ -1,0 +1,3 @@
+<% if @step_name.present? || @track_name.present? %>
+<%= [ @step_name, @track_name ].select(&:present?).join(" — ") %>
+<% end %>

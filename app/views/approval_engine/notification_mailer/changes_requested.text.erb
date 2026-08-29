@@ -1,0 +1,7 @@
+Changes were requested on <%= @target_label %><%= " by #{@actor_label}" if @actor_label.present? %>.
+<%= render partial: "details", formats: [ :text ] %><% if @comment.present? %>
+Their comment:
+
+<%= @comment %>
+<% end %>
+<%= render partial: "call_to_action", formats: [ :text ] %>

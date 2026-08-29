@@ -116,6 +116,45 @@ module ApprovalEngine
       end
     end
 
+    test "step.activated invokes the host's after_step_activated callback" do
+      step = pending_step
+      seen = []
+      Invoice.define_method(:after_step_activated) { |s| seen << s }
+
+      ProcessOutboxJob.perform_now(OutboxEvent.find_by!(event_name: "step.activated", record: step).id)
+
+      assert_equal [ step ], seen
+    ensure
+      Invoice.remove_method(:after_step_activated) if Invoice.method_defined?(:after_step_activated)
+    end
+
+    test "step.reminded invokes the host's on_step_reminder callback" do
+      step = pending_step
+      seen = []
+      Invoice.define_method(:on_step_reminder) { |s| seen << s }
+
+      ProcessOutboxJob.perform_now(emit("step.reminded", record: step).id)
+
+      assert_equal [ step ], seen
+    ensure
+      Invoice.remove_method(:on_step_reminder) if Invoice.method_defined?(:on_step_reminder)
+    end
+
+    test "instruments approval_engine.step.activated for subscribers" do
+      step = pending_step
+      event = OutboxEvent.find_by!(event_name: "step.activated", record: step)
+      received = []
+      callback = ->(*args) { received << ActiveSupport::Notifications::Event.new(*args) }
+
+      ActiveSupport::Notifications.subscribed(callback, "approval_engine.step.activated") do
+        ProcessOutboxJob.perform_now(event.id)
+      end
+
+      assert_equal 1, received.size
+      assert_equal step, received.first.payload[:record]
+      assert_equal @invoice, received.first.payload[:target]
+    end
+
     test "drain! re-enqueues stale unprocessed events, skipping fresh and processed ones" do
       stale = emit("approval.approved")
       stale.update_column(:created_at, 2.minutes.ago)
@@ -157,6 +196,14 @@ module ApprovalEngine
     end
 
     private
+
+    # A real, actionable step under @approval — the shape the step-level events
+    # carry. Creating it also writes its own step.activated event.
+    def pending_step
+      track = @approval.tracks.create!(tenant_id: TENANT, name: "Main")
+      track.steps.create!(tenant_id: TENANT, layer: 1, status: "pending",
+                          assigned_actor: User.create!(name: "M", role: "manager"))
+    end
 
     # Temporarily make the host callback blow up, then restore it — exercises the
     # real job's failure path without any mocking library.

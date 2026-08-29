@@ -1,0 +1,4 @@
+<% content_for :title, "Edit step" %>
+<%= link_to "← #{@track_template.name}", admin_track_template_path(@track_template), class: "ae-back" %>
+<h1>Edit <%= @template_step.name %></h1>
+<%= render "form" %>

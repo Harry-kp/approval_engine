@@ -7,6 +7,10 @@ module ApprovalEngine
 
     validates :name, :assigned_group, presence: true
     validates :layer, numericality: { greater_than: 0 }
+    # A zero or negative deadline expires the step the moment it opens.
+    # FlowDefinition already refuses one; this is the same guard for rows the
+    # admin writes, so both doors into this table agree.
+    validates :timeout_after, numericality: { greater_than: 0 }, allow_nil: true
     validate :approvals_required_is_valid
 
     scope :ordered, -> { order(:layer) }
