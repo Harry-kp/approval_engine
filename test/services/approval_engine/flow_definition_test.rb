@@ -613,5 +613,70 @@ module ApprovalEngine
       assert_equal template, ApprovalEngine.flow(FLOW, tenant: TENANT)
       assert_nil ApprovalEngine.flow("Nothing defined", tenant: TENANT)
     end
+    # JSON Logic writes `var` three ways. Only the bare-name form was recognised,
+    # so a rule the evaluator handles fine was rejected at definition time, and
+    # the error blamed an attribute name nobody had typed.
+    test "accepts the var forms JSON Logic actually supports" do
+      [
+        { ">" => [ { "var" => [ "amount", 0 ] }, 10_000 ] },
+        { ">" => [ { "var" => "amount.cents" }, 10_000 ] }
+      ].each do |condition|
+        assert_nothing_raised do
+          ApprovalEngine.define_flow("Var form #{condition.hash}", tenant: TENANT, model: Invoice) do
+            on :create, when: condition
+            step "Manager", group: "manager"
+          end
+        end
+      end
+    end
+
+    test "still rejects a var that names an attribute nobody exposes" do
+      error = assert_raises(FlowDefinition::DefinitionError) do
+        ApprovalEngine.define_flow("Typo", tenant: TENANT, model: Invoice) do
+          on :create, when: { ">" => [ { "var" => [ "amonut", 0 ] }, 1 ] }
+          step "Manager", group: "manager"
+        end
+      end
+
+      assert_includes error.message, "amonut"
+    end
+
+    # A plain count is validated per group when the approval is built, so this
+    # would write a template that raises BuilderError on every run instead.
+    test "refuses an absolute count spread across several groups" do
+      error = assert_raises(FlowDefinition::DefinitionError) do
+        ApprovalEngine.define_flow("Board sign-off", tenant: TENANT, model: Invoice) do
+          on :create
+          parallel(approvals_required: 2) do
+            step "Legal", group: "legal"
+            step "IT",    group: "it"
+          end
+        end
+      end
+
+      assert_includes error.message, "checked against each group's own members"
+    end
+
+    test "allows a relative spec across several groups, and an absolute count on one" do
+      create_user(role: :legal)
+      create_user(role: :it)
+
+      assert_nothing_raised do
+        ApprovalEngine.define_flow("Relative", tenant: TENANT, model: Invoice) do
+          on :create
+          parallel(approvals_required: :all) do
+            step "Legal", group: "legal"
+            step "IT",    group: "it"
+          end
+        end
+
+        ApprovalEngine.define_flow("Single group", tenant: TENANT, model: Invoice) do
+          on :create, priority: 5
+          parallel(approvals_required: 2) do
+            step "Legal", group: "legal"
+          end
+        end
+      end
+    end
   end
 end

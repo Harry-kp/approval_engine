@@ -59,8 +59,20 @@ module ApprovalEngine
       end
 
       def destroy
-        @trigger_rule.destroy
-        redirect_to admin_track_template_path(@track_template), notice: "Rule deleted."
+        # An Approval keeps the rule that routed it as provenance, on a foreign
+        # key declared `on_delete: :nullify` — so destroying a rule does not
+        # error, it quietly erases "which rule started this?" from every
+        # approval it ever spawned. Deactivating stops it matching anything new
+        # and keeps the history, which is the same trade the template's delete
+        # guard makes and the same one `FlowDefinition#reconcile_rules!` makes.
+        if routed_approvals?
+          redirect_to admin_track_template_path(@track_template),
+                      alert: "This rule has already routed approvals. Untick Active instead — " \
+                             "deleting it would erase which rule started them."
+        else
+          @trigger_rule.destroy
+          redirect_to admin_track_template_path(@track_template), notice: "Rule deleted."
+        end
       end
 
       private
@@ -71,6 +83,10 @@ module ApprovalEngine
 
       def set_trigger_rule
         @trigger_rule = @track_template.trigger_rules.find(params[:id])
+      end
+
+      def routed_approvals?
+        Approval.where(approval_engine_trigger_rule_id: @trigger_rule.id).exists?
       end
 
       # Tolerant of a missing `trigger_rule` key because `new` and `edit` render

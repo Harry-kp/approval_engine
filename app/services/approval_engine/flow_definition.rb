@@ -125,10 +125,33 @@ module ApprovalEngine
         @open_layer = @open_layer_consensus = nil
       end
 
-      return if @declared_steps.any? { |declared| declared.layer == layer }
+      declared_here = @declared_steps.count { |declared| declared.layer == layer }
 
-      raise DefinitionError, "a parallel block in flow #{@name.inspect} declares no steps — it would leave " \
-                             "an empty layer nothing can resolve."
+      if declared_here.zero?
+        raise DefinitionError, "a parallel block in flow #{@name.inspect} declares no steps — it would leave " \
+                               "an empty layer nothing can resolve."
+      end
+
+      guard_absolute_count_across_groups!(approvals_required, declared_here)
+    end
+
+    # An absolute count reads as "flat across the layer", which is how
+    # `Track#tally_for` counts at runtime — but `ApprovalBuilder#guard_consensus!`
+    # validates the same count against each template step's *own* actor list
+    # before an approval is stamped. So `parallel(approvals_required: 2)` over
+    # two one-person groups looks resolvable, and then every approval raises
+    # BuilderError at build time instead. Rather than write a template that only
+    # fails later, and far from here, refuse it now: a relative spec expresses
+    # the same intent and is satisfiable however the groups resolve.
+    def guard_absolute_count_across_groups!(spec, step_count)
+      return unless step_count > 1
+      return unless /\A\d+\z/.match?(spec.to_s)
+
+      raise DefinitionError,
+            "parallel in flow #{@name.inspect} sets approvals_required #{spec.to_s.inspect} across " \
+            "#{step_count} groups. A plain count is checked against each group's own members when an " \
+            "approval is built, so this would raise at approval time unless every group had at least " \
+            "#{spec} people. Use :all, :any, :majority or a percentage, which hold however the groups resolve."
     end
 
     # A rule that routes an event to this flow. `event` is either a literal event
@@ -329,10 +352,23 @@ module ApprovalEngine
     # and hand-written raw JSON Logic is exactly where the typo lives.
     def condition_vars(node)
       case node
-      when Hash  then node.key?("var") ? [ node["var"].to_s ] : node.values.flat_map { |value| condition_vars(value) }
+      when Hash  then node.key?("var") ? Array(var_name(node["var"])) : node.values.flat_map { |value| condition_vars(value) }
       when Array then node.flat_map { |value| condition_vars(value) }
       else []
       end
+    end
+
+    # JSON Logic's `var` operand is not always a bare attribute name. It is also
+    # written `["amount", 0]` to supply a default, and `"line_item.total"` to
+    # walk into nested data — both of which the evaluator implements. Comparing
+    # either form verbatim against the exposure list rejected a rule that works,
+    # and blamed an attribute name nobody had written. An empty operand means
+    # "the whole payload", which reads nothing in particular, so it is skipped.
+    def var_name(operand)
+      key = Array(operand).first.to_s
+      return nil if key.empty?
+
+      key.split(".").first
     end
 
     def integer_priority(value)

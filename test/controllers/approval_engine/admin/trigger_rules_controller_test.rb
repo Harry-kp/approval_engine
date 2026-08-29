@@ -189,6 +189,26 @@ module ApprovalEngine
         assert_redirected_to admin_track_template_path(@template)
       end
 
+      # The sibling delete path refuses this, and reconcile_rules! deactivates
+      # rather than destroys, both because the provenance FK is on_delete:
+      # :nullify — a hard delete silently blanks "which rule started this?" on
+      # every approval the rule ever routed.
+      test "destroy refuses a rule that has already routed approvals" do
+        create_user(role: :manager)
+        rule = create_rule(template: @template, condition: { ">" => [ { "var" => "amount" }, 1 ] })
+        invoice = Invoice.create!(tenant_id: TENANT, amount: 20_000, department: "IT")
+        approval = invoice.run_approval!(event: "invoice.created", tenant_id: TENANT)
+        assert_equal rule, approval.trigger_rule
+
+        assert_no_difference -> { TriggerRule.count } do
+          delete admin_track_template_trigger_rule_path(@template, rule)
+        end
+
+        assert_redirected_to admin_track_template_path(@template)
+        assert_match(/Untick Active/, flash[:alert])
+        assert_equal rule, approval.reload.trigger_rule
+      end
+
       test "index orders rules the way the evaluator resolves them" do
         create_rule(template: @template, condition: { ">" => [ { "var" => "amount" }, 1 ] }, priority: 0)
         create_rule(template: @template, condition: { ">" => [ { "var" => "amount" }, 99 ] }, priority: 10)

@@ -24,6 +24,16 @@ module ApprovalEngine
     # their `default from:` are the whole point of doing so.
     layout "approval_engine/mailer" if superclass == ActionMailer::Base
 
+    # Action Mailer resolves templates from `self.class.mailer_name`, which for a
+    # subclass is the subclass's own path. Without this, the documented
+    # `config.mailer_class` route — subclass this, override one action — raises
+    # ActionView::MissingTemplate for that action *and* for the five inherited
+    # ones, because they would all look under `app/views/<your_mailer>/`.
+    # Pinning the path here means a subclass inherits the engine's views and
+    # overrides only what it actually rewrites. A host that wants its own
+    # templates still gets them: its view path is searched first.
+    default template_path: "approval_engine/notification_mailer"
+
     def step_activated(step, to:)
       assign_step(step)
       notification_mail(to: to)
