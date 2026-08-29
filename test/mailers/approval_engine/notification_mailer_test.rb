@@ -141,5 +141,18 @@ module ApprovalEngine
       assert_not mail.multipart?
       assert_equal "text/plain", mail.mime_type
     end
+    # The ledger records who actually acted. When a delegate asks for changes,
+    # naming the assignee tells the reader the wrong person.
+    test "changes_requested names whoever actually asked" do
+      cover = create_user(role: :manager, name: "Cover Person")
+      Delegation.create!(tenant_id: TENANT, delegator: @step.assigned_actor, delegatee: cover,
+                         starts_at: 1.day.ago, ends_at: 1.day.from_now)
+      @step.request_changes!(by: cover, comment: "Split this across two POs.")
+
+      mail = NotificationMailer.changes_requested(@step.reload, to: "requester@example.test")
+
+      assert_match "Cover Person", body_of(mail, :plain)
+      assert_match "Split this across two POs.", body_of(mail, :plain)
+    end
   end
 end

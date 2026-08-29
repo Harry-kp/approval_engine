@@ -178,5 +178,29 @@ module ApprovalEngine
       assert_no_enqueued_jobs only: ProcessOutboxJob # a mailer problem must not retry the event
       assert_no_enqueued_jobs only: ActionMailer::Base.delivery_job
     end
+    # A delegate can act on the step, so notifying only the assignee tells the
+    # person who is away and not the person who can do something about it.
+    test "a step notification also reaches an active delegate" do
+      enable!
+      cover = create_user(role: :manager, email: "cover@example.test")
+      Delegation.create!(tenant_id: TENANT, delegator: @manager, delegatee: cover,
+                         starts_at: 1.day.ago, ends_at: 1.day.from_now)
+
+      relay(activation)
+
+      assert_equal [ "cover@example.test", "manager@example.test" ],
+                   ActionMailer::Base.deliveries.flat_map(&:to).sort
+    end
+
+    test "an expired delegation is not notified" do
+      enable!
+      cover = create_user(role: :manager, email: "cover@example.test")
+      Delegation.create!(tenant_id: TENANT, delegator: @manager, delegatee: cover,
+                         starts_at: 10.days.ago, ends_at: 5.days.ago)
+
+      relay(activation)
+
+      assert_equal [ "manager@example.test" ], ActionMailer::Base.deliveries.flat_map(&:to)
+    end
   end
 end

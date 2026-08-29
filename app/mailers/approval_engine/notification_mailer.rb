@@ -43,7 +43,11 @@ module ApprovalEngine
 
     def changes_requested(step, to:)
       assign_step(step)
-      @comment = step.audit_logs.where(event: "changes_requested").order(:created_at).last&.comment
+      entry    = step.audit_logs.where(event: "changes_requested").order(:created_at).last
+      @comment = entry&.comment
+      # Name whoever actually asked for changes. A delegate acting for the
+      # assignee is recorded on the ledger, and it is who the reader needs.
+      @actor_label = ApprovalEngine.config.actor_label(entry&.actual_actor || step.assigned_actor)
       notification_mail(to: to)
     end
 

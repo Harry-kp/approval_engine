@@ -96,6 +96,9 @@ step.approve!(by: current_user)   # the CFO's step opens; once they approve too,
                                   # `after_approved` fires through the outbox
 ```
 
+Create the approvers first: a group that resolves to nobody raises at build
+time rather than starting an approval nobody can act on.
+
 Nothing triggered? `invoice.preview_approval(event: "invoice.created")` tells
 you what would have happened, before you go any further — see
 [Gotchas](#gotchas).
@@ -285,6 +288,37 @@ deploy, so it raises on a typo instead of failing closed — an unexposed
 attribute, an unknown lifecycle, a duplicate step name, and a group outside
 `config.approval_groups` all stop the seed with a sentence explaining themselves.
 
+## Testing your flows
+
+The engine ships helpers so a host app can drive an approval without hand-rolling
+fixtures. They are actions and queries rather than assertions, so they read the
+same under Minitest and RSpec.
+
+```ruby
+# test/test_helper.rb
+require "approval_engine/test_helpers"
+
+class ActiveSupport::TestCase
+  include ApprovalEngine::TestHelpers
+end
+```
+
+```ruby
+invoice = Invoice.create!(amount: 20_000)
+
+assert_equal "Manager sign-off", pending_approval_steps(invoice).sole.name
+
+approve_approval_and_settle!(invoice)   # walk every layer, then relay the outbox
+assert_equal "paid", invoice.reload.state
+```
+
+`approve_approval!` walks each layer as it opens, approving with the step's own
+assigned actor unless you pass `by:`. `reject_approval!` stops at whatever is
+waiting. **`drain_approval_outbox!` is the one to remember** — side-effects reach
+your model through the outbox, relayed by ActiveJob, so until the queue runs
+`after_approved` has genuinely not fired and a test asserting on it will fail for
+the right reason and look like the wrong one.
+
 ## Configuration
 
 ```ruby
@@ -372,7 +406,9 @@ ApprovalEngine::ReminderSweepJob.perform_later(tenant_id: account.id)
 ```
 
 Each step is nudged at most once, so running the sweep hourly only makes the
-nudge arrive sooner. It never mails the same person about the same step twice.
+nudge arrive sooner rather than nagging. That guarantee is on the *emission*:
+like every other notification it rides the at-least-once outbox, so a relay
+retry can still deliver a duplicate copy of the same nudge.
 
 Be deliberate about the first run. `reminder_after` is measured from when a step
 became actionable, not from when you switched reminders on, so the first sweep

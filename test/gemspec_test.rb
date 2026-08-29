@@ -61,4 +61,10 @@ class GemspecTest < ActiveSupport::TestCase
   test "the packaged version matches the library" do
     assert_equal ApprovalEngine::VERSION, spec.version.to_s
   end
+
+  # Host apps `require "approval_engine/test_helpers"`, so it has to be in the
+  # package — it lives under lib/ but is not loaded by the engine itself.
+  test "ships the test helpers host apps are told to require" do
+    assert_includes spec.files, "lib/approval_engine/test_helpers.rb"
+  end
 end

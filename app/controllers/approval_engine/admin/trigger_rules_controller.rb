@@ -104,13 +104,22 @@ module ApprovalEngine
       # nil with `@condition_error` set when unreadable, so the action
       # re-renders the form rather than blowing up on the admin.
       def submitted_condition
-        advanced_mode? ? parsed_raw_condition : built_condition
+        condition = advanced_mode? ? parsed_raw_condition : built_condition
+        return if condition.nil?
+
+        # Capped here rather than on the raw path alone: the simple builder can
+        # assemble an oversized condition too, and every rule is evaluated on
+        # the hot path of a host record's save.
+        if condition.to_json.bytesize > MAX_CONDITION_BYTES
+          @condition_error = "is too large (max #{MAX_CONDITION_BYTES} bytes)"
+          return
+        end
+
+        condition
       end
 
       def parsed_raw_condition
         json = trigger_rule_params[:condition_json].to_s
-        raise ArgumentError, "is too large (max #{MAX_CONDITION_BYTES} bytes)" if json.bytesize > MAX_CONDITION_BYTES
-
         parsed = JSON.parse(json)
         # JSON Logic evaluates a non-object as a literal, so an array or bare
         # number would match *every* event of its name.

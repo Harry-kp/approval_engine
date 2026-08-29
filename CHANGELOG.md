@@ -108,8 +108,25 @@ behaviour, and every new surface is off until you switch it on.
   uses `:polynomially_longer`, which 7.0 does not know, and 7.0 is past security
   support. CI now runs the whole supported range rather than one version of it.
 
+### Added
+
+- `ApprovalEngine::TestHelpers` — test support for host applications.
+  `approve_approval!` walks a flow to a decision, `reject_approval!` stops at
+  whatever is waiting, `pending_approval_steps` is the inbox for one record, and
+  `drain_approval_outbox!` relays the side-effects, without which `after_approved`
+  has genuinely not run yet. Actions and queries rather than assertions, so they
+  read the same under Minitest and RSpec.
+
 ### Fixed
 
+- Step notifications ignored delegations. A delegate can act on a step, so
+  mailing only the assignee told the person who was away and not the person who
+  could do something about it. Both are notified now.
+- The `changes_requested` email named the step's assignee rather than whoever
+  actually asked for changes, which is recorded on the ledger and is who the
+  reader needs.
+- The condition size cap applied only to the raw JSON editor, so the simple
+  builder could store an unbounded condition on the same hot path.
 - Approvals attached to a host record whose primary key is a UUID silently lost
   their target. The polymorphic reference columns were created by
   `t.references`, which defaults to bigint, so a UUID cast to `0`: the row

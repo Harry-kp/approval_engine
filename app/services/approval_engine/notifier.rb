@@ -83,12 +83,21 @@ module ApprovalEngine
       Array(recipients).filter_map { |actor| ApprovalEngine.config.actor_email(actor) }.uniq
     end
 
+    # A delegate can act on the step (`Step.actionable_by` includes them), so a
+    # notification that reaches only the assignee tells the wrong person. Both
+    # are mailed: the assignee stays informed, the delegate can act.
     def recipients
       if ACTOR_ADDRESSED.include?(notification)
-        [ record.assigned_actor ]
+        [ record.assigned_actor, *active_delegates_for(record) ]
       else
         ApprovalEngine.config.approval_recipients_for(approval)
       end
+    end
+
+    def active_delegates_for(step)
+      return [] if step.assigned_actor.nil?
+
+      Delegation.active_for(step.assigned_actor, tenant_id: step.tenant_id).map(&:delegatee)
     end
 
     def approval
