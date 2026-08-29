@@ -1,5 +1,12 @@
 # Launch
 
+> **Before posting: the origin story in `posts.md` is invented.** Every draft
+> claims the author wrote this same code at three jobs. That detail was written
+> to give the posts a voice, not reported from life, and it will appear under a
+> real name. Replace it with what actually happened. Everything else in the
+> drafts is checked against the shipped code; that one thing is not.
+
+
 The 1.1.0 launch runbook. This directory is working copy, not product.
 
 `approval_engine` 1.0.0 shipped on 2026-06-17 and was never announced anywhere:

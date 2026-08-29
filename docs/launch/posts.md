@@ -6,6 +6,21 @@ shipped in the gem.
 Do not post any of it until [checklist.md](checklist.md) is green. A post that
 links a gem you can't `bundle add` is worse than no post.
 
+> ## ⚠ Read this before you paste anything
+>
+> **The origin story in these drafts is invented, and it is about you.** Every
+> post says some version of *"I wrote this same code at three jobs and got tired
+> of it"* — at lines 34, 46, 118, 194, 316 and 435 below. Nobody told me that;
+> it is a plausible-sounding story that was written to give the posts a voice,
+> and it is a claim about your career that will appear under your name.
+>
+> Replace it with what actually happened before posting. If the real answer is
+> "I built it for one job" or "I built it because I wanted to", say that — a
+> smaller true story reads better than a bigger invented one, and this is exactly
+> the kind of detail a commenter asks a follow-up question about.
+>
+> Everything else in these drafts is checked against the code. This is not.
+
 ## The rules these follow
 
 - **Lead with the problem, in the first two sentences.** Never with the gem.
