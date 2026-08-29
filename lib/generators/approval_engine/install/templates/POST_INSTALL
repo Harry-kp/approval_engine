@@ -86,4 +86,21 @@ Next steps:
      Each step is nudged at most once, so running it often is safe. While
      reminder_after is nil the sweep is a no-op.
 
+     The dashboard is READ-ONLY until you opt in. To let admins edit templates
+     and routing rules from the browser, without a deploy, set in the
+     initializer (then RESTART — the routes are drawn at boot):
+
+       config.admin_enabled = true
+
+     That flag decides whether the write routes exist. It is NOT authentication
+     and the engine ships none: anyone who can reach the mount can change what
+     routes where. Wrap the mount in your own authenticated constraint:
+
+       authenticate :admin_user, ->(u) { u.super_admin? } do
+         mount ApprovalEngine::Engine => "/approval_engine"
+       end
+
+     The admin needs a full-stack host (sessions for CSRF, and flash); it is
+     not available under config.api_only.
+
 ===============================================================================

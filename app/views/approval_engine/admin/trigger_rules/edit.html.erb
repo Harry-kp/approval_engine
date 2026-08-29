@@ -1,0 +1,19 @@
+<% content_for :title, "Edit rule" %>
+<%= link_to "← #{@track_template.name}", admin_track_template_path(@track_template), class: "ae-back" %>
+<h1>Edit rule</h1>
+
+<%
+  # Editing a live rule changes future routing only — in-flight approvals carry
+  # stamped copies of the steps. But the approvals it already routed still point
+  # at this row, so an audit view of an old one will show the *new* condition.
+  routed_count = ApprovalEngine::Approval.where(approval_engine_trigger_rule_id: @trigger_rule.id).count
+%>
+<% if routed_count.positive? %>
+  <div class="ae-card">
+    <p class="ae-hint">This rule has routed <%= pluralize(routed_count, "approval") %>. Editing it changes what happens
+    next, not what already happened — but those approvals point at this rule, so their provenance will read as
+    whatever you save here.</p>
+  </div>
+<% end %>
+
+<%= render "form" %>

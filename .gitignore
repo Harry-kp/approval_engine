@@ -19,3 +19,6 @@
 
 # OS / editor cruft.
 .DS_Store
+
+# Agent worktrees created by tooling — never part of the repo.
+/.claude/

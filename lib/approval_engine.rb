@@ -1,3 +1,5 @@
+require "set"
+
 require "approval_engine/version"
 require "approval_engine/configuration"
 require "approval_engine/approval_exposure"
@@ -50,5 +52,24 @@ module ApprovalEngine
   # when nothing is defined under that name.
   def self.flow(name, tenant:)
     TrackTemplate.for_tenant(FlowDefinition.tenant_id_for(tenant)).find_by(name: name)
+  end
+
+  class << self
+    # Every model that has called `has_approvals`, by name. Names, not
+    # constants, so the engine never pins a class the development reloader
+    # will throw away — the same reason `config.actor_class` is a String.
+    def register_approvable(model_name)
+      approvable_model_names << model_name.to_s
+    end
+
+    def approvable_model_names
+      @approvable_model_names ||= Set.new
+    end
+
+    # The registered models, resolved fresh each call. A name that no longer
+    # resolves (a model deleted since boot) is dropped rather than raising.
+    def approvable_models
+      approvable_model_names.filter_map { |model_name| model_name.safe_constantize }
+    end
   end
 end

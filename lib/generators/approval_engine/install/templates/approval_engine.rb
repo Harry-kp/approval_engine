@@ -71,4 +71,21 @@ ApprovalEngine.configure do |config|
   # setting this does nothing. Each step is nudged at most once.
   #   config.reminder_after = 2.days.to_i
   config.reminder_after = nil
+
+  # Mounts the built-in admin for templates, steps and routing rules — the
+  # write half of the dashboard, so admins can change routing without a deploy.
+  # Off by default: the dashboard is read-only until you opt in, and a gem
+  # upgrade must never turn a mounted dashboard into a write surface.
+  #
+  # THIS IS NOT AUTHENTICATION. It decides whether the write routes exist at
+  # all, not who may reach them. Anyone who can reach the mount can change what
+  # routes where, so wrap the mount in your own authenticated constraint:
+  #
+  #   authenticate :admin_user, ->(u) { u.super_admin? } do
+  #     mount ApprovalEngine::Engine => "/approval_engine"
+  #   end
+  #
+  # Routes are drawn once at boot, so set this here (an initializer) and restart
+  # the server after changing it.
+  config.admin_enabled = false
 end

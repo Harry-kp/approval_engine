@@ -89,6 +89,13 @@ module ApprovalEngine
     # before configuring this does nothing.
     attr_accessor :reminder_after
 
+    # Mounts the built-in template/rule admin — the write half of the dashboard.
+    # Default false on purpose: 1.0 shipped a read-only dashboard that hosts
+    # mounted behind whatever auth they had, and a gem upgrade must never turn
+    # that into a write surface on its own. Turning it on is not authentication:
+    # wrap the mount in your own authenticated constraint either way.
+    attr_accessor :admin_enabled
+
     def initialize
       @outbox_queue          = :default
       @current_tenant_method = nil
@@ -107,6 +114,8 @@ module ApprovalEngine
       @approval_url_builder  = nil
       @approval_recipients   = nil
       @reminder_after        = nil
+
+      @admin_enabled         = false
     end
 
     # The host's actor class, resolved lazily so reloading works in development.

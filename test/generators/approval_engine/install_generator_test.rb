@@ -19,6 +19,8 @@ module ApprovalEngine
         # generated file must see that notifications are off, not infer it.
         assert_match(/config\.notifications_enabled = false/, content)
         assert_match(/config\.reminder_after = nil/, content)
+
+        assert_match(/config\.admin_enabled = false/, content)
       end
     end
   end

@@ -1,0 +1,41 @@
+<% content_for :title, "Templates" %>
+<h1>Templates</h1>
+
+<div class="ae-filters">
+  <%= link_to admin_track_templates_path, class: ("is-active" unless @tenant_id) do %>
+    All tenants <span class="ae-count"><%= @total %></span>
+  <% end %>
+  <% @tenant_ids.each do |tenant_id| %>
+    <%= link_to admin_track_templates_path(tenant_id: tenant_id), class: ("is-active" if @tenant_id == tenant_id) do %>
+      <%= tenant_id %>
+    <% end %>
+  <% end %>
+</div>
+
+<p class="ae-actions"><%= link_to "New template", new_admin_track_template_path, class: "ae-btn" %></p>
+
+<% if @track_templates.empty? %>
+  <div class="ae-empty">No templates<%= " for tenant #{@tenant_id}" if @tenant_id %>.</div>
+<% else %>
+  <table>
+    <thead>
+      <tr><th>Tenant</th><th>Name</th><th>Status</th><th>Steps</th><th>Rules</th><th>Updated</th><th></th></tr>
+    </thead>
+    <tbody>
+      <% @track_templates.each do |template| %>
+        <tr>
+          <td class="ae-mono"><%= template.tenant_id %></td>
+          <td><%= template.name %></td>
+          <td><%= status_badge(template.status) %></td>
+          <td><%= @step_counts.fetch(template.id, 0) %></td>
+          <td><%= @rule_counts.fetch(template.id, 0) %></td>
+          <td class="ae-meta"><%= template.updated_at.to_fs(:short) %></td>
+          <td><%= link_to "Edit", admin_track_template_path(template) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+  <% if @total > @track_templates.size %>
+    <p class="ae-meta">Showing the most recent <%= @track_templates.size %> of <%= @total %>.</p>
+  <% end %>
+<% end %>

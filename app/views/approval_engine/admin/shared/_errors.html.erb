@@ -1,0 +1,10 @@
+<% if record.errors.any? %>
+  <div class="ae-errors">
+    <strong><%= pluralize(record.errors.count, "problem") %> stopped this from being saved:</strong>
+    <ul>
+      <% record.errors.full_messages.each do |message| %>
+        <li><%= message %></li>
+      <% end %>
+    </ul>
+  </div>
+<% end %>

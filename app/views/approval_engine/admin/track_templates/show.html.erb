@@ -1,0 +1,81 @@
+<% content_for :title, @track_template.name %>
+<%= link_to "← All templates", admin_track_templates_path, class: "ae-back" %>
+
+<h1><%= @track_template.name %> <%= status_badge(@track_template.status) %></h1>
+
+<div class="ae-card">
+  <p class="ae-meta">
+    Tenant <span class="ae-mono"><%= @track_template.tenant_id %></span> ·
+    updated <%= @track_template.updated_at.to_fs(:short) %>
+  </p>
+  <% if @track_template.status != "active" %>
+    <p class="ae-hint">Only <strong>active</strong> templates are ever selected by a rule — a draft or archived template never fires.</p>
+  <% end %>
+  <div class="ae-actions">
+    <%= link_to "Edit template", edit_admin_track_template_path(@track_template), class: "ae-btn is-secondary" %>
+    <%= button_to "Delete template", admin_track_template_path(@track_template), method: :delete, class: "ae-btn is-danger" %>
+  </div>
+</div>
+
+<h2>Steps</h2>
+<% if @template_steps.empty? %>
+  <div class="ae-empty">No steps yet. A template with no steps approves nothing.</div>
+<% else %>
+  <table>
+    <thead>
+      <tr><th>Layer</th><th>Name</th><th>Group</th><th>Approvals required</th><th>Timeout</th><th></th></tr>
+    </thead>
+    <tbody>
+      <% @template_steps.each do |step| %>
+        <tr>
+          <td><%= step.layer %></td>
+          <td><%= step.name %></td>
+          <td class="ae-mono"><%= step.assigned_group %></td>
+          <td><%= step.approvals_required %></td>
+          <td class="ae-meta"><%= timeout_label(step.timeout_after) %></td>
+          <td>
+            <div class="ae-actions">
+              <%= link_to "Edit", edit_admin_track_template_template_step_path(@track_template, step) %>
+              <%= button_to "Delete", admin_track_template_template_step_path(@track_template, step), method: :delete, class: "ae-btn is-danger" %>
+            </div>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>
+<p class="ae-actions"><%= link_to "Add step", new_admin_track_template_template_step_path(@track_template), class: "ae-btn" %></p>
+
+<h2>Rules</h2>
+<% if @trigger_rules.empty? %>
+  <div class="ae-empty">No rules yet. Nothing routes to this template until one exists.</div>
+<% else %>
+  <table>
+    <thead>
+      <tr><th>Event</th><th>Condition</th><th>Priority</th><th>Tenant</th><th>Active</th><th></th></tr>
+    </thead>
+    <tbody>
+      <% @trigger_rules.each do |rule| %>
+        <tr>
+          <td class="ae-mono"><%= rule.event_name %></td>
+          <td><%= condition_summary(rule) %></td>
+          <td><%= rule.priority %></td>
+          <td class="ae-mono">
+            <%= rule.tenant_id %>
+            <% if rule.tenant_id != @track_template.tenant_id %>
+              <p class="ae-hint">Differs from the template's tenant — this rule stamps a cross-tenant approval.</p>
+            <% end %>
+          </td>
+          <td><%= rule.active? ? "Yes" : "No" %></td>
+          <td>
+            <div class="ae-actions">
+              <%= link_to "Edit", edit_admin_track_template_trigger_rule_path(@track_template, rule) %>
+              <%= button_to "Delete", admin_track_template_trigger_rule_path(@track_template, rule), method: :delete, class: "ae-btn is-danger" %>
+            </div>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>
+<p class="ae-actions"><%= link_to "Add rule", new_admin_track_template_trigger_rule_path(@track_template), class: "ae-btn" %></p>
