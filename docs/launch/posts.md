@@ -6,21 +6,21 @@ shipped in the gem.
 Do not post any of it until [checklist.md](checklist.md) is green. A post that
 links a gem you can't `bundle add` is worse than no post.
 
-> ## ⚠ Read this before you paste anything
+> ## ⚠ On the voice of these drafts
 >
-> **The origin story in these drafts is invented, and it is about you.** Every
-> post says some version of *"I wrote this same code at three jobs and got tired
-> of it"*. Every one is now replaced by a `[YOUR STORY]` marker — search this
-> file for it and fill each in before posting. Nobody told me that story;
-> it is a plausible-sounding story that was written to give the posts a voice,
-> and it is a claim about your career that will appear under your name.
+> **These posts make no claims about the author's career, on purpose.** An
+> earlier version of every draft claimed the author had built this same code over
+> and over at past employers — invented to give the posts a voice, not
+> reported from life, and it would have gone out under a real name.
 >
-> Replace it with what actually happened before posting. If the real answer is
-> "I built it for one job" or "I built it because I wanted to", say that — a
-> smaller true story reads better than a bigger invented one, and this is exactly
-> the kind of detail a commenter asks a follow-up question about.
+> They now lead with the problem itself, which stands perfectly well without a
+> backstory, and are first-person only about the one fact that is certain: you
+> built the gem. **They are ready to post as written.**
 >
-> Everything else in these drafts is checked against the code. This is not.
+> If you later want to add the real reason you built it, the natural slots are
+> the paragraph after the opening problem in posts 1, 3 and 5. A small true
+> story beats a big invented one — and it is exactly the detail a commenter
+> follows up on, so only add it if you want that conversation.
 
 ## The rules these follow
 
@@ -38,9 +38,9 @@ links a gem you can't `bundle add` is worse than no post.
 - **End with a question**, and mean it. The point of this launch is to find out
   what the gem cannot express.
 
-The voice is a working engineer who got tired of rebuilding this by hand — not a
-marketer with a gem. Whatever the real reason was, it goes in the `[YOUR STORY]`
-slots below.
+The voice is an engineer explaining a problem, not a marketer with a gem. It
+describes what goes wrong in Rails apps generally and what this gem does about
+it — never what the author did at some past job.
 
 ---
 
@@ -48,25 +48,20 @@ slots below.
 
 **Title**
 
-> [YOUR STORY — the invented version was "the approval-workflow code I'd rewritten
-> at three jobs". If you'd rather not make it personal, this is true as-is:
-> "I built a Rails engine for multi-step approval workflows"]
+> I built a Rails engine for multi-step approvals — the flow is data, not callbacks
 
 **Body**
 
-Every Rails app I've worked on eventually grew an approval step, and it always
-started the same way: an `approved` boolean and an `approved_by_id`. Then
-Finance wanted a second signature over $10k. Then Legal and IT had to review the
-same contract at once. Then someone went on leave and their queue backed up.
-Then an auditor asked who approved invoice #4471 and on whose behalf, and the
-honest answer was "it's spread across three callbacks and a status column we
-overwrite."
+Rails apps tend to grow an approval step eventually, and it almost always starts
+the same way: an `approved` boolean and an `approved_by_id`. Then Finance wants a
+second signature over $10k. Then Legal and IT have to review the same contract at
+once. Then someone goes on leave and their queue backs up. Then an auditor asks
+who approved invoice #4471 and on whose behalf, and the honest answer is "it's
+spread across three callbacks and a status column we overwrite."
 
-[YOUR STORY — the invented version claimed three companies and a third rewrite.
-A sentence or two on why you actually built it. "I wanted it to exist" is a fine
-answer and reads better than an inflated one.]
-
-`approval_engine` is a mountable engine. The flow is data, not code:
+I wrote `approval_engine` so that machinery is a dependency you add rather than
+something each app reimplements a little differently. It is a mountable engine,
+and the flow is data, not code:
 
 ```ruby
 ApprovalEngine.define_flow "High-value invoice", tenant: account.id, model: Invoice do
@@ -135,8 +130,8 @@ Ruby file. So it is a branch, a PR, a review, a deploy and a changelog entry —
 for a number. Do that four times for four customers and the conditional in
 `Invoice#requires_cfo?` is unreadable and nobody will touch it.
 
-[YOUR STORY — the invented version claimed three jobs and two bad solutions.]
-The interesting part is not the approval workflow — it is where the rule lives.
+The interesting part here is not the approval workflow — it is where the rule
+lives.
 
 A rule is a JSON Logic AST in a `jsonb` column, and the flow that owns it is one
 block:
@@ -205,13 +200,13 @@ Alternate, if you want the mechanism in the title (62 characters):
 
 **First comment** — post it immediately after submitting.
 
-Author here. Every app I've worked on eventually grew an approval step, and it
-always started as an `approved` boolean. Then a second signature over $10k, then
+Author here. Rails apps tend to grow an approval step eventually, and it almost
+always starts as an `approved` boolean. Then a second signature over $10k, then
 two departments reviewing at once, then someone on leave whose queue backs up,
 then an auditor asking who approved invoice #4471 and on whose behalf. By then
 the answer lives in three callbacks and a status column that has been
-overwritten twice. [YOUR STORY — the invented version claimed three jobs and a
-third rewrite.] So I pulled it out as a gem.
+overwritten twice. I wrote `approval_engine` so that part is a dependency
+instead.
 
 The flow is data rather than code:
 
@@ -332,9 +327,9 @@ authorised at the time. You open the record. `approved` is `true`.
 seven, because the resubmit set `approved` back to `false`, and that was the
 whole history.
 
-[YOUR STORY — the invented version claimed those eleven months happened at three
-companies. Say what you actually lived, or cut the personal line entirely and let
-the scenario above stand on its own.]
+None of those eleven months involved a bad decision. Each step was the smallest
+reasonable change to the one before it. That is what makes this worth extracting
+rather than warning people about.
 
 ## What the extraction looks like
 
@@ -449,12 +444,10 @@ rewrites submissions, so give him facts and one hook, not adjectives.
 ## 6. Short Ruby newsletter — submission blurb
 
 Submit to Lucian Ghinda via https://newsletter.shortruby.com/ (the submission
-form, or a DM). That newsletter carries the "why" well, so this one is slightly
-more personal.
+form, or a DM). That newsletter carries the "why" well, so this one leads with
+the design decision rather than a feature list.
 
-> [YOUR STORY — the invented version was "the approval-workflow code he had
-> rewritten at three jobs". This one goes to an editor who may print it as sent,
-> so it matters most here.] Harshit built `approval_engine`, a mountable Rails engine for multi-step human
+> Harshit built `approval_engine`, a mountable Rails engine for multi-step human
 > approvals: sequential and parallel tracks, consensus per layer (`:any` /
 > `:all` / `:majority` / a percentage), time-bound delegation that records
 > intended vs actual actor, and an append-only ledger where a rejection appends

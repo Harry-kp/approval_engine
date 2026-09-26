@@ -1,12 +1,11 @@
 # Launch
 
-> **Before posting: fill in the `[YOUR STORY]` slots in `posts.md`.** Every draft
-> originally claimed the author had written this same code at three jobs. That
-> detail was invented to give the posts a voice, not reported from life, and it
-> would have appeared under a real name — so each instance has been replaced with
-> a `[YOUR STORY]` marker saying what it claimed. Grep for the marker; a draft
-> still carrying one is not ready to post. Everything else in the drafts is
-> checked against the shipped code; that one thing never was.
+> **The drafts in `posts.md` make no claims about the author's career, on
+> purpose.** An earlier version of each one claimed the author had built this same
+> code over and over at past employers — invented to give the posts a voice, not
+> reported from life, and it would have gone out under a real name. They now lead with the
+> problem, which carries them fine, and are first-person only about having built
+> the gem. They are ready to post as written; nothing is waiting on you.
 
 
 The 1.1.0 launch runbook. This directory is working copy, not product.

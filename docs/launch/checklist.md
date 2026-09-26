@@ -110,13 +110,11 @@ grep -nE 'fly\.dev|herokuapp|demo\.|\.gif|approval_engine:admin|mailer_views' do
 
 - [ ] That grep returns nothing.
 
-- [ ] No post still carries a `[YOUR STORY]` marker. Each one stands where a
-      draft claimed, in your name, that you had written this code at three jobs —
-      a detail that was invented for voice, not reported. Replace every one with
-      what actually happened, or cut the personal line:
+- [ ] No post claims anything about your history that isn't true. The drafts are
+      written to need no such claim; if you added one, make sure it is yours:
 
 ```sh
-grep -n 'YOUR STORY' docs/launch/posts.md
+grep -niE "at (two|three|four|several|[0-9]+) (jobs|companies|employers|places)|(rewrote|rebuilt|written) (it|this|that machinery)" docs/launch/posts.md
 ```
 
 - [ ] That grep returns nothing.
