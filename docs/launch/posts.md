@@ -10,7 +10,8 @@ links a gem you can't `bundle add` is worse than no post.
 >
 > **The origin story in these drafts is invented, and it is about you.** Every
 > post says some version of *"I wrote this same code at three jobs and got tired
-> of it"* — at lines 34, 46, 118, 194, 316 and 435 below. Nobody told me that;
+> of it"*. Every one is now replaced by a `[YOUR STORY]` marker — search this
+> file for it and fill each in before posting. Nobody told me that story;
 > it is a plausible-sounding story that was written to give the posts a voice,
 > and it is a claim about your career that will appear under your name.
 >
@@ -37,8 +38,9 @@ links a gem you can't `bundle add` is worse than no post.
 - **End with a question**, and mean it. The point of this launch is to find out
   what the gem cannot express.
 
-The voice is a working engineer who wrote the same approval code at three jobs
-and got tired of it. Not a marketer with a gem.
+The voice is a working engineer who got tired of rebuilding this by hand — not a
+marketer with a gem. Whatever the real reason was, it goes in the `[YOUR STORY]`
+slots below.
 
 ---
 
@@ -46,7 +48,9 @@ and got tired of it. Not a marketer with a gem.
 
 **Title**
 
-> I extracted the approval-workflow code I'd rewritten at three jobs into a Rails engine
+> [YOUR STORY — the invented version was "the approval-workflow code I'd rewritten
+> at three jobs". If you'd rather not make it personal, this is true as-is:
+> "I built a Rails engine for multi-step approval workflows"]
 
 **Body**
 
@@ -58,8 +62,9 @@ Then an auditor asked who approved invoice #4471 and on whose behalf, and the
 honest answer was "it's spread across three callbacks and a status column we
 overwrite."
 
-I have now written that machinery three times at three companies. The third time
-I wrote it as a gem instead.
+[YOUR STORY — the invented version claimed three companies and a third rewrite.
+A sentence or two on why you actually built it. "I wanted it to exist" is a fine
+answer and reads better than an inflated one.]
 
 `approval_engine` is a mountable engine. The flow is data, not code:
 
@@ -130,9 +135,8 @@ Ruby file. So it is a branch, a PR, a review, a deploy and a changelog entry —
 for a number. Do that four times for four customers and the conditional in
 `Invoice#requires_cfo?` is unreadable and nobody will touch it.
 
-I hit this at three different jobs and solved it badly twice. The third time I
-pulled the solution out into a gem, and the interesting part is not the approval
-workflow — it is where the rule lives.
+[YOUR STORY — the invented version claimed three jobs and two bad solutions.]
+The interesting part is not the approval workflow — it is where the rule lives.
 
 A rule is a JSON Logic AST in a `jsonb` column, and the flow that owns it is one
 block:
@@ -206,8 +210,8 @@ always started as an `approved` boolean. Then a second signature over $10k, then
 two departments reviewing at once, then someone on leave whose queue backs up,
 then an auditor asking who approved invoice #4471 and on whose behalf. By then
 the answer lives in three callbacks and a status column that has been
-overwritten twice. I rewrote that machinery at three jobs. This is the third
-version, pulled out as a gem.
+overwritten twice. [YOUR STORY — the invented version claimed three jobs and a
+third rewrite.] So I pulled it out as a gem.
 
 The flow is data rather than code:
 
@@ -328,8 +332,9 @@ authorised at the time. You open the record. `approved` is `true`.
 seven, because the resubmit set `approved` back to `false`, and that was the
 whole history.
 
-I have lived some version of those eleven months at three companies. The third
-time, I stopped writing it into the app and wrote it as a gem.
+[YOUR STORY — the invented version claimed those eleven months happened at three
+companies. Say what you actually lived, or cut the personal line entirely and let
+the scenario above stand on its own.]
 
 ## What the extraction looks like
 
@@ -447,8 +452,9 @@ Submit to Lucian Ghinda via https://newsletter.shortruby.com/ (the submission
 form, or a DM). That newsletter carries the "why" well, so this one is slightly
 more personal.
 
-> Harshit extracted the approval-workflow code he had rewritten at three jobs
-> into `approval_engine`, a mountable Rails engine for multi-step human
+> [YOUR STORY — the invented version was "the approval-workflow code he had
+> rewritten at three jobs". This one goes to an editor who may print it as sent,
+> so it matters most here.] Harshit built `approval_engine`, a mountable Rails engine for multi-step human
 > approvals: sequential and parallel tracks, consensus per layer (`:any` /
 > `:all` / `:majority` / a percentage), time-bound delegation that records
 > intended vs actual actor, and an append-only ledger where a rejection appends

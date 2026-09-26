@@ -110,6 +110,17 @@ grep -nE 'fly\.dev|herokuapp|demo\.|\.gif|approval_engine:admin|mailer_views' do
 
 - [ ] That grep returns nothing.
 
+- [ ] No post still carries a `[YOUR STORY]` marker. Each one stands where a
+      draft claimed, in your name, that you had written this code at three jobs —
+      a detail that was invented for voice, not reported. Replace every one with
+      what actually happened, or cut the personal line:
+
+```sh
+grep -n 'YOUR STORY' docs/launch/posts.md
+```
+
+- [ ] That grep returns nothing.
+
 ### 7. The release is cut
 
 Follow [RELEASING.md](../../RELEASING.md); it is tag-driven, so the tag is the
