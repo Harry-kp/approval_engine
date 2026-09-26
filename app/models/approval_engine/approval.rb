@@ -4,6 +4,8 @@ module ApprovalEngine
   # `approvals_required` (`:all` by default, like a layer). Progression methods
   # run while the approval row is locked by the acting step, so they don't relock.
   class Approval < ApplicationRecord
+    include ConsensusValidatable
+
     STATUSES = %w[pending approved rejected quarantined cancelled].freeze
     TERMINAL_STATUSES = %w[approved rejected quarantined cancelled].freeze
 
@@ -20,7 +22,6 @@ module ApprovalEngine
 
     validates :tenant_id, presence: true
     validates :status, inclusion: { in: STATUSES }
-    validate :approvals_required_is_valid
 
     scope :pending, -> { where(status: "pending") }
     scope :quarantined, -> { where(status: "quarantined") }
@@ -115,12 +116,6 @@ module ApprovalEngine
       elsif (approved + pending) < required then :failed
       else :undecided
       end
-    end
-
-    def approvals_required_is_valid
-      return if Consensus.valid?(approvals_required)
-
-      errors.add(:approvals_required, "must be :any, :all, :majority, a percentage like \"60%\", or a positive integer")
     end
 
     def cancel_remaining_tracks!
