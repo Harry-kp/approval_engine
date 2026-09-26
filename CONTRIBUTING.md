@@ -54,5 +54,7 @@ bin/demo                    # boots the dashboard with seeded data
 - **Rich models over service objects.** Prefer ActiveRecord behaviour and bang
   methods to procedural managers.
 - Follow the surrounding style; `rubocop-rails-omakase` is the source of truth.
+- `AGENTS.md` holds the same commands and gotchas in the form a coding agent
+  reads. If you change a command or hit a trap worth warning about, update it.
 
 By contributing, you agree your work is licensed under the project's MIT License.
