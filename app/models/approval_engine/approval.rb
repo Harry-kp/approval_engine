@@ -5,6 +5,7 @@ module ApprovalEngine
   # run while the approval row is locked by the acting step, so they don't relock.
   class Approval < ApplicationRecord
     include ConsensusValidatable
+    include Outboxable
 
     STATUSES = %w[pending approved rejected quarantined cancelled].freeze
     TERMINAL_STATUSES = %w[approved rejected quarantined cancelled].freeze
@@ -125,15 +126,6 @@ module ApprovalEngine
         end
         track.update!(status: "cancelled")
       end
-    end
-
-    def emit_outbox(event_name, reason = nil)
-      OutboxEvent.create!(
-        tenant_id: tenant_id,
-        event_name: event_name,
-        record: self,
-        error_payload: reason
-      )
     end
   end
 end

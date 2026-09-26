@@ -11,6 +11,7 @@ module ApprovalEngine
   # "Approve" clicks can never double-resolve a step.
   class Step < ApplicationRecord
     include ConsensusValidatable
+    include Outboxable
 
     # Lifecycle. `waiting` steps belong to a future layer and are not yet
     # actionable; they are activated to `pending` once the prior layer resolves.
@@ -273,10 +274,6 @@ module ApprovalEngine
         actual_actor: by,
         comment: comment
       )
-    end
-
-    def emit_outbox(event_name)
-      OutboxEvent.create!(tenant_id: tenant_id, event_name: event_name, record: self)
     end
 
     def emit_activation
