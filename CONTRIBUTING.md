@@ -5,7 +5,7 @@ clone to a green test run.
 
 ## Getting started
 
-ApprovalEngine is a Rails engine. It needs **Ruby 3.1+** and **PostgreSQL**.
+ApprovalEngine is a Rails engine. It needs **Ruby 3.2+** and **PostgreSQL**.
 
 ```sh
 git clone https://github.com/Harry-kp/approval_engine
