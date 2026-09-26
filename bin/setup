@@ -5,8 +5,22 @@ cd "$(dirname "$0")/.."
 echo "== Installing dependencies =="
 bundle install
 
+# Migrate rather than load schema.rb. The dump is gitignored, so on a fresh
+# clone there is nothing to load; and a copy left over from an older schema (a
+# renamed table, say) is worse than nothing, because Rails' maintain_test_schema
+# loads it over the migrations and the whole suite then fails with errors that
+# read like broken code rather than a stale database. Always build from source.
+#
+# The engine's migrations and the dummy app's interleave by timestamp but run
+# from separate paths, so the engine needs a second pass to pick up its own
+# migrations that sort after the dummy's. This mirrors CI exactly.
 echo "== Preparing the test database =="
 echo "Set DATABASE_URL to your Postgres if it isn't on the default socket."
-bin/rails app:db:test:prepare
+rm -f test/dummy/db/schema.rb
+export RAILS_ENV=test
+bin/rails app:db:create
+bin/rails app:db:migrate
+(cd test/dummy && bin/rails db:migrate)
+bin/rails app:db:migrate
 
 echo "== Done. Run the suite with: bin/rails app:test =="
