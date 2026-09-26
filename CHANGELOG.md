@@ -5,6 +5,31 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Housekeeping only — no behaviour change, no public API change.
+
+### Fixed
+
+- `bin/setup` failed on a fresh clone. It ran `app:db:test:prepare`, which loads
+  `test/dummy/db/schema.rb` — a gitignored file that does not exist until
+  something has migrated. It now migrates instead, mirroring CI: create, engine
+  pass, dummy pass, engine pass again for the engine migrations that sort after
+  the dummy's. The clone-to-green path in CONTRIBUTING.md now works as written.
+- `CONTRIBUTING.md` told contributors Ruby 3.1 while the gemspec has required
+  `>= 3.2.0` since 1.0 — anyone who believed it could not `bundle install`.
+  `.rubocop.yml` targeted 3.1 for the same reason and is now at 3.2.
+
+### Changed
+
+- The `approvals_required` validation lived in `Approval`, `Step` and
+  `TemplateStep` as three byte-identical copies, error string included; it is now
+  the `ConsensusValidatable` concern. `emit_outbox` likewise moves to
+  `Outboxable` — its two copies had already drifted in signature.
+- Added `AGENTS.md` (with `CLAUDE.md` importing it) so a coding agent has the
+  verified command set and the repo's traps without rediscovering them. Neither
+  file ships in the gem.
+
 ## [1.1.0] - 2026-08-29
 
 Three things 1.0 left you to build: authoring a flow, editing routing rules in a

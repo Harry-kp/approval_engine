@@ -10,6 +10,12 @@ if (rails_version = ENV["RAILS_VERSION"]) && !rails_version.empty?
   gem "rails", "~> #{rails_version}.0"
   # Rails 7.x predates Minitest 6, whose runner signature it calls incorrectly.
   gem "minitest", "~> 5.25" if rails_version.start_with?("7.")
+  # ActiveSupport's JSON encoder passes `quirks_mode:` to JSON.generate up to
+  # Rails 8.0; json 3 removed the keyword, so every migration raises
+  # `ArgumentError: unknown keyword: quirks_mode` before a test can run. Fixed
+  # in 7.2 and 8.1+, which is why the unpinned matrix entry is unaffected. Drop
+  # this once 7.1/8.0 leave the support range.
+  gem "json", "< 3" if rails_version.start_with?("7.1", "8.0")
 end
 
 gem "puma"

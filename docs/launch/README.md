@@ -1,10 +1,11 @@
 # Launch
 
-> **Before posting: the origin story in `posts.md` is invented.** Every draft
-> claims the author wrote this same code at three jobs. That detail was written
-> to give the posts a voice, not reported from life, and it will appear under a
-> real name. Replace it with what actually happened. Everything else in the
-> drafts is checked against the shipped code; that one thing is not.
+> **The drafts in `posts.md` make no claims about the author's career, on
+> purpose.** An earlier version of each one claimed the author had built this same
+> code over and over at past employers — invented to give the posts a voice, not
+> reported from life, and it would have gone out under a real name. They now lead with the
+> problem, which carries them fine, and are first-person only about having built
+> the gem. They are ready to post as written; nothing is waiting on you.
 
 
 The 1.1.0 launch runbook. This directory is working copy, not product.

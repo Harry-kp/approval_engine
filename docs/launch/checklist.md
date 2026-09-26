@@ -110,6 +110,15 @@ grep -nE 'fly\.dev|herokuapp|demo\.|\.gif|approval_engine:admin|mailer_views' do
 
 - [ ] That grep returns nothing.
 
+- [ ] No post claims anything about your history that isn't true. The drafts are
+      written to need no such claim; if you added one, make sure it is yours:
+
+```sh
+grep -niE "at (two|three|four|several|[0-9]+) (jobs|companies|employers|places)|(rewrote|rebuilt|written) (it|this|that machinery)" docs/launch/posts.md
+```
+
+- [ ] That grep returns nothing.
+
 ### 7. The release is cut
 
 Follow [RELEASING.md](../../RELEASING.md); it is tag-driven, so the tag is the

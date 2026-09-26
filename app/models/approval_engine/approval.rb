@@ -4,6 +4,9 @@ module ApprovalEngine
   # `approvals_required` (`:all` by default, like a layer). Progression methods
   # run while the approval row is locked by the acting step, so they don't relock.
   class Approval < ApplicationRecord
+    include ConsensusValidatable
+    include Outboxable
+
     STATUSES = %w[pending approved rejected quarantined cancelled].freeze
     TERMINAL_STATUSES = %w[approved rejected quarantined cancelled].freeze
 
@@ -20,7 +23,6 @@ module ApprovalEngine
 
     validates :tenant_id, presence: true
     validates :status, inclusion: { in: STATUSES }
-    validate :approvals_required_is_valid
 
     scope :pending, -> { where(status: "pending") }
     scope :quarantined, -> { where(status: "quarantined") }
@@ -117,12 +119,6 @@ module ApprovalEngine
       end
     end
 
-    def approvals_required_is_valid
-      return if Consensus.valid?(approvals_required)
-
-      errors.add(:approvals_required, "must be :any, :all, :majority, a percentage like \"60%\", or a positive integer")
-    end
-
     def cancel_remaining_tracks!
       tracks.where(status: %w[pending]).find_each do |track|
         track.steps.where(status: Track::OPEN_STEP_STATUSES).find_each do |step|
@@ -130,15 +126,6 @@ module ApprovalEngine
         end
         track.update!(status: "cancelled")
       end
-    end
-
-    def emit_outbox(event_name, reason = nil)
-      OutboxEvent.create!(
-        tenant_id: tenant_id,
-        event_name: event_name,
-        record: self,
-        error_payload: reason
-      )
     end
   end
 end

@@ -3,6 +3,8 @@ module ApprovalEngine
   # step is expanded into one concrete Step per resolved actor, all sharing the
   # layer's consensus condition (`approvals_required`).
   class TemplateStep < ApplicationRecord
+    include ConsensusValidatable
+
     belongs_to :track_template, class_name: "ApprovalEngine::TrackTemplate", foreign_key: "approval_engine_track_template_id"
 
     validates :name, :assigned_group, presence: true
@@ -11,16 +13,7 @@ module ApprovalEngine
     # FlowDefinition already refuses one; this is the same guard for rows the
     # admin writes, so both doors into this table agree.
     validates :timeout_after, numericality: { greater_than: 0 }, allow_nil: true
-    validate :approvals_required_is_valid
 
     scope :ordered, -> { order(:layer) }
-
-    private
-
-    def approvals_required_is_valid
-      return if Consensus.valid?(approvals_required)
-
-      errors.add(:approvals_required, "must be :any, :all, :majority, a percentage like \"60%\", or a positive integer")
-    end
   end
 end

@@ -10,6 +10,9 @@ module ApprovalEngine
   # drop a transactional-outbox event — all in one transaction — so concurrent
   # "Approve" clicks can never double-resolve a step.
   class Step < ApplicationRecord
+    include ConsensusValidatable
+    include Outboxable
+
     # Lifecycle. `waiting` steps belong to a future layer and are not yet
     # actionable; they are activated to `pending` once the prior layer resolves.
     STATUSES = %w[waiting pending approved rejected changes_requested expired cancelled].freeze
@@ -32,7 +35,6 @@ module ApprovalEngine
     validates :tenant_id, presence: true
     validates :status, inclusion: { in: STATUSES }
     validates :layer, :iteration, numericality: { greater_than: 0 }
-    validate :approvals_required_is_valid
 
     before_update :guard_immutable_transition
     before_save :stamp_timing
@@ -274,10 +276,6 @@ module ApprovalEngine
       )
     end
 
-    def emit_outbox(event_name)
-      OutboxEvent.create!(tenant_id: tenant_id, event_name: event_name, record: self)
-    end
-
     def emit_activation
       emit_outbox("step.activated")
     end
@@ -291,12 +289,6 @@ module ApprovalEngine
 
       errors.add(:status, "cannot transition from #{from} to #{to}")
       throw :abort
-    end
-
-    def approvals_required_is_valid
-      return if Consensus.valid?(approvals_required)
-
-      errors.add(:approvals_required, "must be :any, :all, :majority, a percentage like \"60%\", or a positive integer")
     end
 
     # Stamp the cycle-time facts wherever a step's status changes — at build, on
